@@ -89,7 +89,7 @@ transformed parameters {
 model {
   // Priors
   y_at_knots ~ normal(0, 10);
-  sigma ~ normal(0, 1);
+  sigma ~ exponential(2);  // Better prior for positive-constrained parameter
   
   // Likelihood
   y ~ normal(y_hat, sigma);

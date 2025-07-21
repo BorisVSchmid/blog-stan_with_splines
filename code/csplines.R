@@ -14,11 +14,14 @@ groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
 # Load cmdstanr after its dependencies
 library(cmdstanr)
 
+# Source smoothing diagnostics
+source("code/smoothing_diagnostics.R")
+
 # Generate test data with complex function
 set.seed(123)
 n <- 30
 x <- seq(0, 10, length.out = n)
-y_true <- sin(x) + 0.4 * cos(3*x)
+y_true <- sin(x) + 0.4 * cos(3*x) + 0.2*x
 y <- y_true + rnorm(n, 0, 0.15)
 
 # Prepare data for Stan
@@ -44,6 +47,11 @@ fit <- model$sample(
   iter_sampling = 1000,
   refresh = 0
 )
+
+# Run smoothing diagnostics
+cat("\n")
+diagnosis <- diagnose_smoothing(fit, x, y, stan_data, "cspline")
+print_smoothing_diagnostics(diagnosis)
 
 # Extract and plot results
 draws <- fit$draws(format = "matrix")
@@ -72,7 +80,7 @@ data_points <- data.frame(
 
 # High-resolution true function for smooth plotting
 x_true_hires <- seq(min(x), max(x), length.out = 1000)
-y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires)
+y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires) + 0.2*x_true_hires
 true_function_data <- data.frame(
   x = x_true_hires,
   y_true = y_true_hires
@@ -88,12 +96,12 @@ p <- ggplot() +
   scale_fill_manual(values = c("95% CI" = "darkgreen")) +
   labs(
     title = "C-spline (Natural Cubic Spline) Fit with 95% Credible Interval",
-    subtitle = "True function: sin(x) + 0.4*cos(3x)",
+    subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.2*x",
     caption = paste0("Parameters: num_knots = ", stan_data$num_knots),
     x = "x",
     y = "y"
   ) +
-  ylim(-1.6, 1.6) +
+  ylim(-1.6, 3.6) +  # Adjusted range for 0.2*x linear term
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "bottom",

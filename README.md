@@ -263,6 +263,75 @@ This project was developed with [Claude Code](https://claude.ai/code), an AI cod
 - Document capabilities, limitations, and usage patterns
 - Ensure proper attribution and licensing compliance
 
+## Testing
+
+This project includes a comprehensive test suite to verify the correctness and properties of both spline implementations.
+
+### Test Files
+
+| Test Script | Purpose | Coverage |
+|-------------|---------|----------|
+| `tests/quick_test.R` | Basic functionality check | Quick verification of both implementations |
+| `tests/test_numerical_accuracy.R` | Mathematical properties | Partition of unity, interpolation accuracy, monotonicity |
+| `tests/test_analytical_solutions.R` | Known function fitting | Polynomials, constants, step functions, sine waves |
+| `tests/test_splines.R` | Comprehensive function tests | Multiple function types and edge cases |
+| `tests/test_regional_splines.R` | Hierarchical models | Multi-region splines with shared priors |
+
+### Running Tests
+
+```r
+# Run all tests with summary
+source("run-tests.R")
+
+# Run individual test suites
+source("tests/quick_test.R")                    # Fast basic check
+source("tests/test_numerical_accuracy.R")       # Mathematical properties
+source("tests/test_analytical_solutions.R")     # Known solutions
+source("tests/test_splines.R")                  # Comprehensive tests
+source("tests/test_regional_splines.R")         # Hierarchical models
+```
+
+### Test Coverage
+
+Our test suite covers:
+
+#### Mathematical Properties
+- **Partition of Unity**: B-splines sum to 1 at any point
+- **Interpolation Accuracy**: Closeness to data points
+- **Linear Function Fitting**: Perfect fit for linear data
+- **Monotonicity Preservation**: Maintaining trends in data
+
+#### Analytical Solutions
+- **Polynomial Fitting**: Cubic splines fitting cubic polynomials
+- **Constant Functions**: Both splines fitting flat data
+- **Step Function Approximation**: Handling discontinuous data
+- **Sine Wave Fitting**: Smooth periodic function approximation
+
+#### Edge Cases and Robustness
+- **Minimal Data**: Testing with few data points (n=5)
+- **Different Spline Degrees**: B-splines with degree 2, 3, 4
+- **Various Function Types**: Linear, polynomial, exponential, complex
+- **Boundary Behavior**: Knot placement and extrapolation limits
+
+#### Performance and Comparison
+- **Timing Comparisons**: B-splines vs C-splines execution time
+- **Regional Models**: Hierarchical splines for multiple regions
+- **Parameter Sensitivity**: Different knot numbers and smoothing levels
+
+### Test Philosophy
+
+The tests follow the validation approach of the original repositories:
+
+- **C-splines**: Based on numerical accuracy tests from [segasai/stan-splines](https://github.com/segasai/stan-splines)
+- **B-splines**: Extended beyond original case study to include comprehensive validation
+- **Pure R implementation**: All tests run in R without external dependencies
+
+Tests are designed to be:
+- **Robust** to MCMC stochasticity
+- **Fast** enough for regular validation
+- **Comprehensive** in coverage
+- **Clear** in output and failure reporting
+
 ## TODO
 
 ### Comparison with R's splines package

@@ -1,13 +1,20 @@
 // B-splines with random walk smoothing prior
 functions {
-  vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order) {
+  vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
     vector[size(t)] b_spline;
     vector[size(t)] w1 = rep_vector(0, size(t));
     vector[size(t)] w2 = rep_vector(0, size(t));
     
     if (order==1)
-      for (i in 1:size(t))
-        b_spline[i] = (ext_knots[ind] <= t[i]) && (t[i] < ext_knots[ind+1]);
+      for (i in 1:size(t)) {
+        // For the rightmost data point, assign it to the last non-zero interval
+        if (t[i] >= ext_knots[size(ext_knots) - degree] && 
+            ind == size(ext_knots) - degree - 1) {
+          b_spline[i] = 1;
+        } else {
+          b_spline[i] = (ext_knots[ind] <= t[i]) && (t[i] < ext_knots[ind+1]);
+        }
+      }
     else {
       if (abs(ext_knots[ind] - ext_knots[ind+order-1]) > 1e-10)
         w1 = (to_vector(t) - rep_vector(ext_knots[ind], size(t))) /
@@ -15,8 +22,8 @@ functions {
       if (abs(ext_knots[ind+1] - ext_knots[ind+order]) > 1e-10)
         w2 = 1 - (to_vector(t) - rep_vector(ext_knots[ind+1], size(t))) /
                  (ext_knots[ind+order] - ext_knots[ind+1]);
-      b_spline = w1 .* build_b_spline(t, ext_knots, ind, order-1) +
-                 w2 .* build_b_spline(t, ext_knots, ind+1, order-1);
+      b_spline = w1 .* build_b_spline(t, ext_knots, ind, order-1, degree) +
+                 w2 .* build_b_spline(t, ext_knots, ind+1, order-1, degree);
     }
     return b_spline;
   }
@@ -70,7 +77,7 @@ transformed data {
   }
   
   for (i in 1:num_basis) {
-    B[i, :] = to_row_vector(build_b_spline(x, ext_knots_arr, i, spline_order));
+    B[i, :] = to_row_vector(build_b_spline(x, ext_knots_arr, i, spline_order, spline_degree));
   }
 }
 
@@ -101,13 +108,13 @@ transformed parameters {
 
 model {
   // Priors
-  alpha_0 ~ normal(mean(y), sd(y));
+  alpha_0 ~ normal(mean(y), fmax(sd(y), 0.1 * fmax(abs(mean(y)), 1.0)));  // Scale adapts to data magnitude, min 0.1
   if (tau_smooth > 0) {
     alpha_raw ~ std_normal();  // Standard normal for non-centered parameterization
   } else {
     alpha_raw ~ normal(0, prior_scale);  // Configurable prior when no smoothing
   }
-  sigma ~ normal(0, 1);
+  sigma ~ exponential(2);  // Better prior for positive-constrained parameter
   
   // Likelihood
   y ~ normal(y_hat, sigma);
@@ -126,7 +133,7 @@ generated quantities {
   }
   
   for (i in 1:num_basis) {
-    B_plot[i, :] = to_row_vector(build_b_spline(x_plot, ext_knots_arr, i, spline_order));
+    B_plot[i, :] = to_row_vector(build_b_spline(x_plot, ext_knots_arr, i, spline_order, spline_degree));
   }
   
   y_plot = alpha_0 + to_vector(alpha' * B_plot);
