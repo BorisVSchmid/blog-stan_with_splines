@@ -86,12 +86,20 @@ data_points <- data.frame(
   y_true = y_true
 )
 
+# High-resolution true function for smooth plotting
+x_true_hires <- seq(min(x), max(x), length.out = 1000)
+y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires)
+true_function_data <- data.frame(
+  x = x_true_hires,
+  y_true = y_true_hires
+)
+
 # Create plot with ggplot2
 p <- ggplot() +
   geom_ribbon(data = fit_data, aes(x = x, ymin = y_hat_lower, ymax = y_hat_upper, fill = "95% CI"), alpha = 0.3) +
   geom_line(data = fit_data, aes(x = x, y = y_hat, color = "B-spline fit"), linewidth = 1.2) +
   geom_point(data = data_points, aes(x = x, y = y, color = "Data"), size = 2, alpha = 0.7) +
-  geom_line(data = data_points, aes(x = x, y = y_true, color = "True function"), linetype = "dashed", linewidth = 1) +
+  geom_line(data = true_function_data, aes(x = x, y = y_true, color = "True function"), linetype = "dashed", linewidth = 1) +
   scale_color_manual(values = c("Data" = "black", "B-spline fit" = "blue", "True function" = "red")) +
   scale_fill_manual(values = c("95% CI" = "blue")) +
   labs(
@@ -104,6 +112,7 @@ p <- ggplot() +
     x = "x",
     y = "y"
   ) +
+  ylim(-1.6, 1.6) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "bottom",
