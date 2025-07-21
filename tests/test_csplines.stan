@@ -7,7 +7,7 @@
 
 functions {
   // Include the spline functions from the library
-  #include "spline.stan"
+  #include "../code/cspline_library/spline.stan"
 }
 
 data {

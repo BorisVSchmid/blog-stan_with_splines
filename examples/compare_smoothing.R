@@ -21,10 +21,9 @@ x <- seq(0, 10, length.out = n)
 y_true <- sin(x) + 0.3 * cos(3*x)  # More complex function
 y <- y_true + rnorm(n, 0, 0.15)
 
-# Compile models
-cat("Compiling models...\n")
-model_standard <- cmdstan_model("code/bsplines.stan")
-model_smooth <- cmdstan_model("code/bsplines_smooth.stan")
+# Compile model
+cat("Compiling model...\n")
+model <- cmdstan_model("code/bsplines.stan")  # Single model handles both smoothing and non-smoothing
 
 # Fit standard B-spline (no smoothing)
 cat("Fitting standard B-spline (no smoothing)...\n")
@@ -33,10 +32,11 @@ stan_data_standard <- list(
   x = x,
   y = y,
   num_knots = 15,  # Many knots to show overfitting
-  spline_degree = 3
+  spline_degree = 3,
+  tau_smooth = 0  # No smoothing for standard fit
 )
 
-fit_standard <- model_standard$sample(
+fit_standard <- model$sample(
   data = stan_data_standard,
   chains = 2,
   iter_warmup = 500,
@@ -58,10 +58,10 @@ for (i in seq_along(smoothing_levels)) {
     y = y,
     num_knots = 15,
     spline_degree = 3,
-    tau_fixed = tau
+    tau_smooth = tau
   )
   
-  fits_smooth[[i]] <- model_smooth$sample(
+  fits_smooth[[i]] <- model$sample(
     data = stan_data_smooth,
     chains = 2,
     iter_warmup = 500,

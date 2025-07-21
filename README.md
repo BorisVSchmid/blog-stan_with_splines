@@ -2,6 +2,8 @@
 
 This repository contains minimal implementations for testing B-splines and natural cubic splines (C-splines) in Stan, with comprehensive testing and comparison tools.
 
+**Built with [Claude Code](https://claude.ai/code)** - An AI-powered coding assistant that helped create, test, and document this project.
+
 ## Overview
 
 Two spline implementations are provided:
@@ -23,7 +25,7 @@ Two spline implementations are provided:
 ### Regional/Hierarchical Models
 - `test_regional_splines.stan` - Full hierarchical model with smoothness penalties
 - `test_regional_splines_v2.stan` - Simplified hierarchical model
-- `run_regional_splines_fixed.R` - Complete regional analysis with visualizations
+- `run_regional_splines.R` - Complete regional analysis with visualizations
 - `demo_regional_splines.R` - Simple demonstration of regional concepts
 
 ### Output
@@ -31,12 +33,28 @@ Two spline implementations are provided:
 
 ## Usage
 
-```r
-# Run comprehensive tests
-source("test_splines.R")
+Three main entry points are provided:
 
-# Run quick test
-source("quick_test.R")
+```r
+# Run minimal code examples (simple demonstrations)
+source("run-code.R")
+
+# Run extended examples (complex analyses, comparisons)
+source("run-examples.R")
+
+# Run test suite (verify implementations)
+source("run-tests.R")
+```
+
+For direct access to specific functionality:
+```r
+# Minimal examples
+source("code/bsplines.R")   # B-spline minimal example
+source("code/csplines.R")   # C-spline minimal example
+
+# Extended examples
+source("examples/compare_smoothing.R")      # B-spline smoothing comparison
+source("examples/run_regional_splines.R")   # Regional hierarchical models
 ```
 
 ## Capabilities Comparison
@@ -209,7 +227,7 @@ alpha[r] ~ normal(mu_alpha, tau_alpha);
 source("demo_regional_splines.R")
 
 # Full analysis with visualizations
-source("run_regional_splines_fixed.R")
+source("run_regional_splines.R")
 ```
 
 ## Future Enhancements
@@ -233,3 +251,45 @@ See [ATTRIBUTION.md](ATTRIBUTION.md) for important information about third-party
 - C-splines: [stan-splines library](https://github.com/segasai/stan-splines) by Sergey Koposov
   - **Required citation**: Koposov et al. (2019), MNRAS, 485, 4726
 - General reference: "The Elements of Statistical Learning" by Hastie, Tibshirani, and Friedman
+
+## Development
+
+This project was developed with [Claude Code](https://claude.ai/code), an AI coding assistant that helped:
+- Extract and adapt minimal spline implementations from complex outbreak models
+- Create comprehensive test suites for both B-splines and C-splines
+- Implement smoothing/regularization for B-splines using random walk priors
+- Develop regional spline models with hierarchical priors
+- Generate visualization code with proper uncertainty quantification
+- Document capabilities, limitations, and usage patterns
+- Ensure proper attribution and licensing compliance
+
+## TODO
+
+### Comparison with R's splines package
+- Validate B-spline implementation against `splines::bs()`
+- Compare C-spline results with `splines::ns()` 
+- Benchmark performance differences
+- Document any discrepancies in knot placement or boundary behavior
+
+### Performance Optimizations
+- Implement iterative B-spline algorithm to avoid recursion overhead
+- Add memoization for repeated basis function evaluations
+- Profile and optimize for large datasets (10,000+ points)
+
+### Enhanced Functionality
+- Add derivative computation for both spline types
+- Implement alternative boundary conditions for B-splines (not-a-knot, clamped)
+- Add monotonic and shape-constrained spline options
+- Support for periodic/cyclic splines
+
+### Model Selection and Diagnostics
+- Implement automatic knot selection via cross-validation
+- Add WAIC and LOO-CV computation for model comparison
+- Create diagnostic plots for knot placement effectiveness
+- Add residual analysis tools
+
+### Documentation and Examples
+- Create vignette comparing spline types for different use cases
+- Add examples with real-world datasets
+- Document computational complexity and memory usage
+- Create interactive Shiny app for spline exploration

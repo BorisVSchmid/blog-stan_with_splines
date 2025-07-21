@@ -111,12 +111,11 @@ array[] int spline_findpos(vector nodes, vector x)
         if (success==0)
 	  {
 	    // Handle boundary cases - assign to nearest knot interval
+	    // This enables extrapolation by assigning out-of-bounds points to boundary intervals
 	    if (x[i] < nodes[1]) {
-	      ret[i] = 1;
-	    } else if (x[i] >= nodes[n_nodes]) {
-	      ret[i] = n_nodes - 1;
+	      ret[i] = 1;  // Extrapolate using first interval
 	    } else {
-	      reject("Point outside knot range and not at boundary");
+	      ret[i] = n_nodes - 1;  // Extrapolate using last interval
 	    }
 	  }
       }

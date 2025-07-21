@@ -82,7 +82,7 @@ cat("- Economic indicators across countries with shared global trends\n")
 cat("- Environmental measurements across sites with common underlying processes\n")
 
 cat("\nTo fit the full model, run:\n")
-cat("model <- cmdstan_model('test_regional_splines_v2.stan')\n")
+cat("model <- cmdstan_model('test_regional_splines.stan')\n")
 cat("fit <- model$sample(data = stan_data, chains = 4)\n")
 
 cat("\nPlot saved: output/regional_data.png\n")

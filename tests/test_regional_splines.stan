@@ -1,8 +1,8 @@
 // Regional B-splines: Multiple splines for different regions with shared priors
-// Each region gets its own spline while sharing global parameters
+// Simplified version with better priors
 
 functions {
-  // B-spline basis function (same as before)
+  // B-spline basis function
   vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order) {
     vector[size(t)] b_spline;
     vector[size(t)] w1 = rep_vector(0, size(t));
@@ -42,13 +42,7 @@ transformed data {
   int num_basis = num_knots + spline_degree - 1;
   int spline_order = spline_degree + 1;
   
-  // Count observations per region
-  array[n_regions] int n_per_region = rep_array(0, n_regions);
-  for (i in 1:n_total) {
-    n_per_region[region[i]] += 1;
-  }
-  
-  // Set up knots (same for all regions for simplicity)
+  // Set up knots
   vector[num_knots] knots;
   array[2*spline_degree + num_knots] real ext_knots_arr;
   
@@ -91,7 +85,6 @@ transformed data {
   
   print("Regional B-spline setup:");
   print("  Number of regions: ", n_regions);
-  print("  Observations per region: ", n_per_region);
   print("  Number of basis functions: ", num_basis);
   print("  Knot locations: ", knots);
 }
@@ -104,18 +97,13 @@ parameters {
   row_vector[num_basis] mu_alpha;              // Global mean
   vector<lower=0>[num_basis] tau_alpha;        // Global SD
   
-  // Shared noise parameter (could also be regional)
+  // Shared noise parameter
   real<lower=0> sigma;
   
-  // Optional: Regional baseline shifts
+  // Regional baseline shifts
   vector[n_regions] beta_region;
   real mu_beta;
   real<lower=0> sigma_beta;
-  
-  // Optional: Smoothness penalty parameters
-  vector<lower=0>[n_regions] lambda;           // Smoothness for each region
-  real<lower=0> mu_lambda;                     // Mean smoothness
-  real<lower=0> sigma_lambda;                  // SD of smoothness
 }
 
 transformed parameters {
@@ -129,32 +117,20 @@ transformed parameters {
 
 model {
   // Hierarchical priors for spline coefficients
-  mu_alpha ~ normal(0, 5);
-  tau_alpha ~ normal(0, 2);
+  mu_alpha ~ normal(0, 2);
+  tau_alpha ~ normal(0, 1);
   
   for (r in 1:n_regions) {
     alpha[r] ~ normal(mu_alpha, tau_alpha);
-    
-    // Optional: Smoothness penalty (second differences)
-    if (num_basis > 2) {
-      for (j in 3:num_basis) {
-        target += -lambda[r] * square(alpha[r][j] - 2*alpha[r][j-1] + alpha[r][j-2]);
-      }
-    }
   }
   
   // Priors for regional effects
-  mu_beta ~ normal(0, 2);
-  sigma_beta ~ normal(0, 1);
+  mu_beta ~ normal(0, 1);
+  sigma_beta ~ normal(0, 0.5);
   beta_region ~ normal(mu_beta, sigma_beta);
   
-  // Priors for smoothness
-  mu_lambda ~ normal(0, 1);
-  sigma_lambda ~ normal(0, 0.5);
-  lambda ~ normal(mu_lambda, sigma_lambda);
-  
   // Shared noise prior
-  sigma ~ normal(0, 1);
+  sigma ~ normal(0, 0.5);
   
   // Likelihood
   y ~ normal(y_hat, sigma);
@@ -162,13 +138,14 @@ model {
 
 generated quantities {
   // Predictions for each region on a fine grid
-  int n_plot = 100;
   array[100] real x_plot;
   matrix[num_basis, 100] B_plot;
   array[n_regions] vector[100] y_plot;
   
-  // Regional effects
-  vector[n_regions] total_effect = beta_region;
+  // Variance components
+  real var_between = variance(beta_region);
+  real var_within = square(sigma);
+  real icc = var_between / (var_between + var_within);
   
   // Create plotting grid
   real x_min = min(x);
@@ -187,9 +164,4 @@ generated quantities {
   for (r in 1:n_regions) {
     y_plot[r] = to_vector(alpha[r] * B_plot) + beta_region[r];
   }
-  
-  // Compute variance components
-  real var_between = variance(beta_region);
-  real var_within = square(sigma);
-  real icc = var_between / (var_between + var_within);
 }

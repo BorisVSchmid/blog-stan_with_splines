@@ -2,6 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## About This Project
+
+This project was built collaboratively with Claude Code to:
+- Extract minimal, working spline implementations from complex epidemiological models
+- Create comprehensive test frameworks for B-splines and C-splines in Stan
+- Implement advanced features like smoothing priors and regional hierarchical models
+- Document best practices and usage patterns for Stan splines
+
+The development process involved iterative refinement, with Claude Code helping to:
+- Debug Stan compilation issues and syntax requirements
+- Implement proper uncertainty quantification
+- Create visualizations using ggplot2 with appropriate themes
+- Ensure proper attribution and licensing compliance
+- Organize code following R package conventions
+
 ## Project Structure
 
 - `code/` - Core Stan models and R functions

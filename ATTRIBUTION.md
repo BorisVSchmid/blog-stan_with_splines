@@ -5,19 +5,29 @@ This project includes code derived from the following sources:
 ## B-spline Implementation
 
 - **Source**: [Stan Case Study: Splines in Stan](https://mc-stan.org/learn-stan/case-studies/splines_in_stan.html)
+- **GitHub Repository**: [https://github.com/milkha/Splines_in_Stan](https://github.com/milkha/Splines_in_Stan)
 - **Author**: Milad Kharratzadeh
 - **Date**: October 24, 2017
 - **License**: Not explicitly stated
-- **Files affected**: `test_bsplines.stan` (build_b_spline function)
+- **Files affected**: `bsplines.stan`, `test_bsplines.stan` (build_b_spline function)
 
 The B-spline implementation follows the algorithm described in the Stan case study. Users should consult the original source for any licensing terms.
+
+### Penalization/Smoothing Approach
+
+Both Milad's original implementation and our implementation use a random walk penalization approach:
+- **Original (b_spline_penalized.stan)**: Uses `a[i] = a[i-1] + a_raw[i]*tau`
+- **Our implementation**: Uses the same approach with `alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth`
+
+This creates a smoothing effect by constraining successive B-spline coefficients to be similar, with the smoothing strength controlled by the tau parameter.
 
 ## Natural Cubic Spline Implementation
 
 - **Source**: [stan-splines library](https://github.com/segasai/stan-splines)
 - **Author**: Sergey Koposov (University of Edinburgh, Institute for Astronomy)
-- **License**: Listed as "Other (Open)" on Zenodo, specific license not found
-- **Files affected**: `spline.stan` (entire file), `test_csplines.stan` (includes spline.stan)
+- **License**: Listed as "Other (Open)" on Zenodo with no further description
+- **License Status**: ⚠️ **Unclear** - No LICENSE file in GitHub repository as of January 2025
+- **Files affected**: `code/cspline_library/spline.stan` (entire file), `csplines.stan` and `test_csplines.stan` (include spline.stan)
 - **Modifications**: Added boundary case handling in spline_findpos function
 
 ### Required Citation
@@ -32,12 +42,21 @@ DOI: https://doi.org/10.5281/zenodo.7193910
 
 ## License Compatibility Note
 
-Neither the B-spline case study nor the stan-splines library have clearly stated standard open-source licenses. While this project is distributed under the BSD 3-Clause License, this applies only to the original code written for this project. 
+### B-splines
+The Stan case study does not specify a license. As it's part of Stan's educational materials, it's likely intended for public use, but no explicit license is stated.
 
-Users should:
-1. Check the original sources for their licensing terms
-2. Ensure proper attribution when using code derived from these sources
-3. Contact the original authors if clarification is needed for commercial use
+### C-splines (stan-splines)
+**⚠️ LICENSE UNCLEAR**: 
+- Zenodo lists as "Other (Open)" without specification
+- No LICENSE file in GitHub repository (checked January 2025)
+- Author contact: Sergey Koposov (skoposov AT ed DOT ac DOT uk)
+
+**Recommendations for C-spline usage:**
+1. For academic/research use: Cite as required (see above)
+2. For commercial use: Contact the author for explicit permission
+3. For distribution: Consider implementing your own natural cubic spline functions
+
+This project's BSD 3-Clause License applies only to original code, not to third-party implementations.
 
 ## Original Work
 

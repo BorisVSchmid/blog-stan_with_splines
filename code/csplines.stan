@@ -7,7 +7,7 @@
 
 functions {
   // Include the spline functions from the library
-  #include "spline.stan"
+  #include "cspline_library/spline.stan"
 }
 
 data {
@@ -20,6 +20,10 @@ data {
 }
 
 transformed data {
+  // Input validation
+  if (num_knots < 2) reject("num_knots must be at least 2");
+  if (n_data < num_knots) reject("insufficient data points for given number of knots");
+  
   // Knot locations
   vector[num_knots] knot_locations;
   
@@ -93,10 +97,10 @@ model {
 
 generated quantities {
   // For plotting: evaluate spline on a fine grid
-  int n_plot = 100;
-  vector[100] x_plot;  // Must use literal for array size
-  array[100] int x_plot_positions;
-  vector[100] y_plot;
+  int n_plot = 1000;
+  vector[1000] x_plot;  // Must use literal for array size
+  array[1000] int x_plot_positions;
+  vector[1000] y_plot;
   
   // Create plotting grid
   real x_min = min(x) - 0.1 * (max(x) - min(x));
@@ -110,8 +114,8 @@ generated quantities {
     x_max = knot_locations[num_knots];
   }
   
-  for (i in 1:n_plot) {
-    x_plot[i] = x_min + (x_max - x_min) * (i - 1.0) / (n_plot - 1.0);
+  for (i in 1:1000) {
+    x_plot[i] = x_min + (x_max - x_min) * (i - 1.0) / 999.0;
   }
   
   // Find positions and evaluate spline
