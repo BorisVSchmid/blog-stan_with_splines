@@ -133,7 +133,7 @@ generated quantities {
   }
 }
 '
-  write(stan_code, "test_bsplines_boundary.stan")
+  write(stan_code, "code/test_bsplines_boundary.stan")
 }
 
 # Fit and plot
@@ -152,7 +152,7 @@ stan_data_b <- list(
   spline_degree = 3
 )
 
-model_b <- cmdstan_model("test_bsplines_boundary.stan")
+model_b <- cmdstan_model("code/test_bsplines_boundary.stan")
 fit_b <- model_b$sample(
   data = stan_data_b,
   chains = 2,
@@ -170,7 +170,7 @@ stan_data_c <- list(
   num_knots = 7
 )
 
-model_c <- cmdstan_model("test_csplines.stan")
+model_c <- cmdstan_model("code/csplines.stan")
 fit_c <- model_c$sample(
   data = stan_data_c,
   chains = 2,
@@ -202,13 +202,20 @@ x_extended <- seq(-2, 12, length.out = 200)
 # C-splines are linear outside the knot range
 
 plot_b <- ggplot() +
-  geom_ribbon(aes(x = x_plot_b, ymin = y_lower_b, ymax = y_upper_b), alpha = 0.2, fill = "blue") +
-  geom_line(aes(x = x_plot_b, y = y_plot_b), color = "blue", linewidth = 1) +
-  geom_point(data = data.frame(x = data$x, y = data$y), aes(x, y), alpha = 0.6, size = 2) +
-  geom_line(data = data.frame(x = data$x, y = data$y_true), aes(x, y), 
-            color = "red", linetype = "dashed", linewidth = 1) +
+  geom_ribbon(aes(x = x_plot_b, ymin = y_lower_b, ymax = y_upper_b, fill = "Fitted spline"), 
+              alpha = 0.2) +
+  geom_line(aes(x = x_plot_b, y = y_plot_b, color = "Fitted spline"), linewidth = 1) +
+  geom_point(data = data.frame(x = data$x, y = data$y), 
+             aes(x, y, shape = "Observed data"), alpha = 0.6, size = 2) +
+  geom_line(data = data.frame(x = data$x, y = data$y_true), 
+            aes(x, y, color = "True function"), linetype = "dashed", linewidth = 1) +
+  scale_color_manual(name = "Legend", 
+                     values = c("Fitted spline" = "blue", "True function" = "red")) +
+  scale_fill_manual(name = "Legend", values = c("Fitted spline" = "blue")) +
+  scale_shape_manual(name = "Legend", values = c("Observed data" = 16)) +
   labs(title = "B-spline fit (boundary knots at data extremes)", x = "x", y = "y") +
   theme_bw() +
+  theme(legend.position = "bottom") +
   coord_cartesian(xlim = c(-0.5, 10.5))
 
 # C-spline plot with extended range
@@ -222,19 +229,27 @@ x_true_extended <- seq(-2, 12, length.out = 200)
 y_true_extended <- sin(x_true_extended)
 
 plot_c <- ggplot() +
-  geom_ribbon(aes(x = x_plot_c, ymin = y_lower_c, ymax = y_upper_c), alpha = 0.2, fill = "blue") +
-  geom_line(aes(x = x_plot_c, y = y_plot_c), color = "blue", linewidth = 1) +
-  geom_point(data = data.frame(x = data$x, y = data$y), aes(x, y), alpha = 0.6, size = 2) +
-  geom_line(data = data.frame(x = x_true_extended, y = y_true_extended), aes(x, y), 
-            color = "red", linetype = "dashed", linewidth = 0.8, alpha = 0.7) +
+  geom_ribbon(aes(x = x_plot_c, ymin = y_lower_c, ymax = y_upper_c, fill = "Fitted spline"), 
+              alpha = 0.2) +
+  geom_line(aes(x = x_plot_c, y = y_plot_c, color = "Fitted spline"), linewidth = 1) +
+  geom_point(data = data.frame(x = data$x, y = data$y), 
+             aes(x, y, shape = "Observed data"), alpha = 0.6, size = 2) +
+  geom_line(data = data.frame(x = x_true_extended, y = y_true_extended), 
+            aes(x, y, color = "True function"), 
+            linetype = "dashed", linewidth = 0.8, alpha = 0.7) +
   geom_vline(xintercept = c(0, 10), linetype = "dotted", alpha = 0.5) +
   annotate("text", x = 5, y = -1.5, label = "Data range", size = 3) +
-  annotate("text", x = -1, y = -1.5, label = "Linear\nextrapolation", size = 3) +
-  annotate("text", x = 11, y = -1.5, label = "Linear\nextrapolation", size = 3) +
+  annotate("text", x = -1, y = -1.5, label = "Spline becomes\nlinear here", size = 3) +
+  annotate("text", x = 11, y = -1.5, label = "Spline becomes\nlinear here", size = 3) +
+  scale_color_manual(name = "Legend", 
+                     values = c("Fitted spline" = "blue", "True function" = "red")) +
+  scale_fill_manual(name = "Legend", values = c("Fitted spline" = "blue")) +
+  scale_shape_manual(name = "Legend", values = c("Observed data" = 16)) +
   labs(title = "C-spline (Natural Cubic Spline) - Extended view", 
-       subtitle = "Note: C-splines extrapolate linearly beyond knot boundaries",
+       subtitle = "The fitted spline (blue) extrapolates linearly beyond the data range",
        x = "x", y = "y") +
   theme_bw() +
+  theme(legend.position = "bottom") +
   coord_cartesian(xlim = c(-2, 12), ylim = c(-2, 2))
 
 # Save individual plots
@@ -246,7 +261,7 @@ combined <- plot_b / plot_c
 combined_with_title <- combined + 
   plot_annotation(
     title = "B-splines vs C-splines: Boundary Behavior",
-    subtitle = "B-spline now includes boundary knots; C-spline shows linear extrapolation"
+    subtitle = "B-splines show polynomial continuation; C-splines become linear outside data range"
   )
 
 ggsave("output/spline_comparison_extended.png", combined_with_title, width = 10, height = 12, dpi = 300)

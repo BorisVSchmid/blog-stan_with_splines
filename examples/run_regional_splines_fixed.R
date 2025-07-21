@@ -49,7 +49,7 @@ stan_data <- list(
 
 # Compile and fit model
 cat("Compiling regional splines model...\n")
-model <- cmdstan_model("test_regional_splines_v2.stan")
+model <- cmdstan_model("tests/test_regional_splines_v2.stan")
 
 cat("Fitting model with hierarchical priors...\n")
 fit <- model$sample(
@@ -87,21 +87,29 @@ p_data <- ggplot(data, aes(x = x, y = y, color = region_name)) +
 
 ggsave("output/regional_splines_data.png", p_data, width = 8, height = 10, dpi = 300)
 
-# Plot 2: Extract fitted values from transformed parameters
-y_hat <- colMeans(draws[, grep("y_hat\\[", colnames(draws), value = TRUE)])
-data$y_fitted <- y_hat
+# Plot 2: Extract fitted values with credible intervals
+y_hat_cols <- grep("y_hat\\[", colnames(draws), value = TRUE)
+y_hat_mean <- colMeans(draws[, y_hat_cols])
+y_hat_lower <- apply(draws[, y_hat_cols], 2, quantile, 0.025)
+y_hat_upper <- apply(draws[, y_hat_cols], 2, quantile, 0.975)
+
+data$y_fitted <- y_hat_mean
+data$y_lower <- y_hat_lower
+data$y_upper <- y_hat_upper
 
 p_fitted <- ggplot(data, aes(x = x)) +
+  geom_ribbon(aes(ymin = y_lower, ymax = y_upper, fill = region_name), alpha = 0.3) +
   geom_point(aes(y = y, color = region_name), alpha = 0.5) +
   geom_line(aes(y = y_fitted, color = region_name), linewidth = 1.2) +
   geom_line(aes(y = y_true), linetype = "dashed", alpha = 0.5) +
   facet_wrap(~ region_name, ncol = 1, scales = "free_y") +
-  labs(title = "Regional B-Splines Fit",
-       subtitle = "Points: data, Solid: fitted splines, Dashed: true functions",
+  labs(title = "Regional B-Splines Fit with 95% Credible Intervals",
+       subtitle = "Points: data, Solid: fitted splines, Shaded: 95% CI, Dashed: true functions",
        x = "x", y = "y") +
   theme_bw() +
   theme(legend.position = "none") +
-  scale_color_brewer(palette = "Set2")
+  scale_color_brewer(palette = "Set2") +
+  scale_fill_brewer(palette = "Set2")
 
 ggsave("output/regional_splines_fitted.png", p_fitted, width = 8, height = 10, dpi = 300)
 

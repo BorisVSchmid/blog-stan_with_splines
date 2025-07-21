@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Structure
+
+- `code/` - Core Stan models and R functions
+- `tests/` - Test scripts for verifying implementations
+- `examples/` - Example analyses and demonstrations
+- `output/` - Generated plots and results
+- `claude-tmp/` - Temporary/experimental scripts created by Claude (not part of main project)
+
 ## Commands
 
 ### Running Tests
