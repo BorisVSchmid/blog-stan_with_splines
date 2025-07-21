@@ -143,7 +143,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   if (high_edf && high_autocor) {
     warnings <- c(warnings, 
       "High EDF with high autocorrelation suggests possible model misspecification",
-      "Consider: different knot placement, or the function may have features the spline cannot capture")
+      "The function may have features that the current spline configuration cannot capture")
     # Don't give contradictory advice in this case
   } else if (high_autocor || few_runs || low_edf) {
     # Classic over-smoothing (too smooth, not flexible enough)
