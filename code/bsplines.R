@@ -25,15 +25,17 @@ y <- y_true + rnorm(n, 0, 0.15)
 
 # Key features demonstration:
 # 1. Adaptive knot selection based on data size
-# Rule of thumb: n/8 for B-splines to avoid overfitting
-# (more conservative than n/4 due to B-spline flexibility)
-adaptive_knots <- max(4, min(round(n/8), 20))
+# Rule of thumb: n/4 for B-splines (with tau=1 smoothing)
+adaptive_knots <- max(4, min(round(n/4), 20))
 
 # 2. Adaptive prior scale based on data variance
 adaptive_prior <- 2 * sd(y)
 
-# 3. Choose between smoothing and flexibility
-use_smoothing <- FALSE  # Set to TRUE for smoother curves
+# 3. Default mild smoothing for more stable fits
+# Note: tau_smooth scale is counterintuitive:
+# - tau_smooth < 0.5: Strong smoothing (very restrictive)
+# - tau_smooth = 1.0: Mild smoothing (recommended default)
+# - tau_smooth > 2.0: Almost no smoothing effect
 
 # Prepare data for Stan
 stan_data <- list(
@@ -42,7 +44,7 @@ stan_data <- list(
   y = y,
   num_knots = adaptive_knots,     # Using adaptive selection
   spline_degree = 3,              # Cubic splines (most common)
-  tau_smooth = if(use_smoothing) 0.2 else 0,  # Smoothing on/off
+  tau_smooth = 1.0,  # Default mild smoothing
   prior_scale = adaptive_prior    # Data-driven prior
 )
 
@@ -53,7 +55,7 @@ model <- cmdstan_model("code/bsplines.stan")
 cat("Fitting model with:\n")
 cat("  - Adaptive knots:", adaptive_knots, "(based on n =", n, ")\n")
 cat("  - Prior scale:", round(adaptive_prior, 2), "(based on data variance)\n")
-cat("  - Smoothing:", if(use_smoothing) "enabled (τ = 0.2)" else "disabled", "\n\n")
+cat("  - Smoothing: τ =", stan_data$tau_smooth, "\n\n")
 
 fit <- model$sample(
   data = stan_data,
@@ -117,7 +119,7 @@ p <- ggplot() +
     subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.2*x",
     caption = paste0("Parameters: Adaptive knots = ", stan_data$num_knots, 
                      ", Adaptive prior = ", round(stan_data$prior_scale, 1),
-                     ", Smoothing = ", if(use_smoothing) paste0("tau = ", stan_data$tau_smooth) else "off",
+                     ", tau_smooth = ", stan_data$tau_smooth,
                      ", Estimated sigma = ", round(sigma, 3)),
     x = "x",
     y = "y"
@@ -136,16 +138,4 @@ print(p)
 dir.create("output", showWarnings = FALSE)
 ggsave("output/bspline_minimal_example.png", p, width = 8, height = 6, dpi = 300)
 
-# Print summary
-cat("\nModel Summary:\n")
-cat("==============\n")
-cat("Estimated noise (σ):", round(sigma, 3), "\n")
-cat("Number of knots specified:", adaptive_knots, "\n")
-cat("Number of basis functions:", adaptive_knots + stan_data$spline_degree - 1, "(knots + degree - 1)\n")
-cat("Effective smoothing:", if(use_smoothing) "random walk prior" else "independent priors", "\n")
-
-# Diagnostic check
-cat("\nTo try different settings, modify:\n")
-cat("  - use_smoothing: TRUE for smooth curves, FALSE for flexible fit\n")
-cat("  - n: Sample size (affects adaptive knot selection)\n")
-cat("  - Add more noise to y to see adaptive prior scaling\n")
+# The diagnostic function above already prints all necessary information

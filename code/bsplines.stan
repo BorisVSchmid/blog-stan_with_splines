@@ -35,8 +35,8 @@ data {
   vector[n_data] y;
   int<lower=1> num_knots;
   int<lower=1> spline_degree;
-  real<lower=0> tau_smooth;  // Smoothing parameter for random walk prior
-  real<lower=0> prior_scale;  // Scale for coefficient priors when tau_smooth = 0
+  real<lower=0> tau_smooth;  // Smoothing parameter (0.1=strong, 1.0=mild, 2.0+=minimal)
+  real<lower=0> prior_scale;  // Scale for coefficient priors
 }
 
 transformed data {
@@ -91,16 +91,10 @@ transformed parameters {
   vector[num_basis] alpha;  // Actual spline coefficients
   vector[n_data] y_hat;
   
-  // Apply smoothing if requested
-  if (tau_smooth > 0) {
-    // Random walk prior with smoothing
-    alpha[1] = alpha_raw[1];
-    for (i in 2:num_basis) {
-      alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth;
-    }
-  } else {
-    // No smoothing - direct coefficients
-    alpha = alpha_raw;
+  // Apply random walk smoothing
+  alpha[1] = alpha_raw[1] * prior_scale;
+  for (i in 2:num_basis) {
+    alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth;
   }
   
   y_hat = alpha_0 + to_vector(alpha' * B);
@@ -109,11 +103,7 @@ transformed parameters {
 model {
   // Priors
   alpha_0 ~ normal(mean(y), fmax(sd(y), 0.1 * fmax(abs(mean(y)), 1.0)));  // Scale adapts to data magnitude, min 0.1
-  if (tau_smooth > 0) {
-    alpha_raw ~ std_normal();  // Standard normal for non-centered parameterization
-  } else {
-    alpha_raw ~ normal(0, prior_scale);  // Configurable prior when no smoothing
-  }
+  alpha_raw ~ std_normal();  // Standard normal for non-centered parameterization
   sigma ~ exponential(2);  // Better prior for positive-constrained parameter
   
   // Likelihood

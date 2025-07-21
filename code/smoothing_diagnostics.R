@@ -182,7 +182,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
     
     if (model_type == "bspline" && diagnosis$has_bspline_params) {
       suggestions <- c(suggestions,
-        "  - In R script: Consider using tau_smooth > 0 for smoother transitions"
+        "  - In R script: Consider decreasing tau_smooth (e.g., to 0.5) for smoother transitions"
       )
     } else if (model_type == "cspline") {
       suggestions <- c(suggestions,
@@ -373,31 +373,72 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
 
 # Print diagnostic results
 print_smoothing_diagnostics <- function(diagnosis) {
-  cat("\nSmoothing Diagnostics (Experimental)\n")
+  # Model Summary first
+  cat("\nModel Summary:\n")
+  cat("==============\n")
+  cat(sprintf("Number of knots: %d\n", diagnosis$num_knots))
+  cat(sprintf("Basis functions: %d", diagnosis$num_basis))
+  if (!is.na(diagnosis$num_basis) && !is.na(diagnosis$num_knots)) {
+    cat(" (knots + degree - 1)\n")
+  } else {
+    cat("\n")
+  }
+  if (!is.na(diagnosis$tau_smooth)) {
+    cat(sprintf("Smoothing tau: %.1f\n", diagnosis$tau_smooth))
+  }
+  cat(sprintf("Estimated noise σ: %.3f\n", diagnosis$sigma_estimate))
+  
+  # Smoothing Diagnostics
+  cat("\nSmoothing Diagnostics (Experimental):\n")
   cat("====================================\n")
   
-  cat(sprintf("Effective degrees of freedom: %.1f\n", diagnosis$edf))
-  cat(sprintf("Estimated sigma: %.3f\n", diagnosis$sigma_estimate))
+  # Calculate max EDF for context
+  max_edf <- ifelse(!is.na(diagnosis$num_basis), diagnosis$num_basis + 1, diagnosis$num_knots + 1)
+  edf_percent <- (diagnosis$edf / max_edf) * 100
+  cat(sprintf("Effective degrees of freedom: %.1f of %d possible (%.0f%%)\n", 
+              diagnosis$edf, max_edf, edf_percent))
+  # Autocorrelation with interpretation
+  autocor_level <- ifelse(diagnosis$residual_autocor > 0.3, " (high)", 
+                          ifelse(diagnosis$residual_autocor > 0.2, " (moderate)", " (low)"))
+  cat(sprintf("Residual autocorrelation: %.3f%s\n", diagnosis$residual_autocor, autocor_level))
   cat(sprintf("Residual SD: %.3f\n", diagnosis$residual_sd))
-  cat(sprintf("Residual autocorrelation: %.3f\n", diagnosis$residual_autocor))
   cat(sprintf("LOO RMSE: %.3f\n", diagnosis$loo_rmse))
   
   if (!is.na(diagnosis$smoothness)) {
     cat(sprintf("Smoothness (2nd diff SD): %.3f\n", diagnosis$smoothness))
   }
   
-  cat(sprintf("Runs test proportion: %.3f\n", diagnosis$runs_proportion))
+  cat(sprintf("Runs test: %.3f\n", diagnosis$runs_proportion))
+  
+  # Assessment section
+  cat("\nAssessment: ")
+  if (diagnosis$over_smoothed) {
+    cat("Model appears over-smoothed\n")
+  } else if (diagnosis$overfitted) {
+    cat("Model appears overfitted\n")
+  } else if (length(diagnosis$warnings) > 0 && grepl("misspecification", diagnosis$warnings[1])) {
+    cat("Model shows signs of misspecification\n")
+  } else {
+    cat("Smoothing level appears appropriate\n")
+  }
   
   if (length(diagnosis$warnings) > 0) {
-    cat("\nWarnings:\n")
     for (warning in diagnosis$warnings) {
-      cat("  •", warning, "\n")
+      cat("-", warning, "\n")
     }
   }
   
   cat("\nRecommendations:\n")
-  for (suggestion in diagnosis$suggestions) {
-    cat(" ", suggestion, "\n")
+  if (length(diagnosis$suggestions) > 0) {
+    for (suggestion in diagnosis$suggestions) {
+      cat(" ", suggestion, "\n")
+    }
+    # Add general advice about parameter adjustment
+    cat("\nParameter adjustment guide:\n")
+    cat("- tau_smooth: Lower values = more smoothing (0.1 very smooth, 2.0+ minimal)\n")
+    cat("- num_knots: Fewer knots = smoother fit, more knots = flexible fit\n")
+  } else {
+    cat("No adjustments needed - model fit appears appropriate.\n")
   }
 }
 
