@@ -39,7 +39,7 @@ stan_data <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = adaptive_knots,     # Using adaptive selection
+  num_knots = 20,     # Use adaptive_knots if you need a default.
   spline_degree = 3,              # Cubic splines (most common)
   smoothing_strength = 5.0,  # Default moderate-strong smoothing
   prior_scale = adaptive_prior    # Data-driven prior
