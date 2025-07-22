@@ -4,13 +4,8 @@ Comprehensive test suite for B-spline and C-spline implementations in Stan.
 
 ## Running Tests
 
-### Run ALL tests (recommended)
+### Run all tests
 From the project root directory:
-```bash
-Rscript run-all-tests.R
-```
-
-### Run core tests only (faster)
 ```bash
 Rscript run-tests.R
 ```
