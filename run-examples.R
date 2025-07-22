@@ -1,41 +1,43 @@
-# Run extended examples and demonstrations
-# More complex analyses showing spline capabilities
+# Run all spline examples
+# Demonstrates various capabilities of the B-spline and C-spline implementations
 
-cat("Stan Splines - Extended Examples\n")
-cat("================================\n\n")
+cat("Stan Splines - Running All Examples\n")
+cat("===================================\n\n")
 
-# Available examples
-examples <- c(
-  "1. Spline comparison plots (examples/generate_plots_extended.R)",
-  "2. Regional splines with hierarchical priors (examples/run_regional_splines.R)", 
-  "3. B-spline smoothing comparison (examples/compare_smoothing.R)",
-  "4. All examples"
+# Track timing
+start_time <- Sys.time()
+
+# List of examples to run
+examples <- list(
+  list(name = "Spline comparison plots", file = "examples/generate_plots_extended.R"),
+  list(name = "B-spline smoothing comparison", file = "examples/compare_smoothing.R"),
+  list(name = "Smoothing strength guide", file = "examples/smoothing_strength_guide.R"),
+  list(name = "Diagnostics demonstration", file = "examples/diagnostics_demo.R"),
+  list(name = "Regional splines with hierarchical priors", file = "examples/run_regional_splines.R")
 )
 
-cat("Available examples:\n")
-cat(paste(examples, collapse = "\n"), "\n\n")
-
-# For non-interactive use, run all examples
-choice <- 4
-
-if (interactive()) {
-  choice <- as.numeric(readline("Select example (1-4): "))
+# Run each example
+for (i in seq_along(examples)) {
+  example <- examples[[i]]
+  
+  cat(sprintf("\n[%d/%d] %s\n", i, length(examples), example$name))
+  cat(rep("-", 50), "\n", sep = "")
+  
+  example_start <- Sys.time()
+  
+  tryCatch({
+    source(example$file)
+    cat(sprintf("\n✓ Completed in %.1f seconds\n", 
+                as.numeric(Sys.time() - example_start, units = "secs")))
+  }, error = function(e) {
+    cat(sprintf("\n✗ ERROR: %s\n", e$message))
+  })
 }
 
-# Run selected examples
-if (choice == 1 || choice == 4) {
-  cat("\n--- Running spline comparison plots ---\n")
-  source("examples/generate_plots_extended.R")
-}
+# Summary
+total_time <- as.numeric(Sys.time() - start_time, units = "secs")
 
-if (choice == 2 || choice == 4) {
-  cat("\n--- Running regional splines demonstration ---\n")
-  source("examples/run_regional_splines.R")
-}
-
-if (choice == 3 || choice == 4) {
-  cat("\n--- Running B-spline smoothing comparison ---\n")
-  source("examples/compare_smoothing.R")
-}
-
-cat("\nExamples complete. Check output/ directory for results.\n")
+cat("\n", rep("=", 50), "\n", sep = "")
+cat(sprintf("All examples completed in %.1f seconds\n", total_time))
+cat("Check output/ directory for generated plots and results\n")
+cat(rep("=", 50), "\n", sep = "")

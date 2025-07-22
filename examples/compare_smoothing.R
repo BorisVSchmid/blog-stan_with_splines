@@ -33,7 +33,7 @@ stan_data_standard <- list(
   y = y,
   num_knots = 15,  # Many knots to show overfitting
   spline_degree = 3,
-  tau_smooth = 0  # No smoothing for standard fit
+  smoothing_strength = 0  # No smoothing for standard fit
 )
 
 fit_standard <- model$sample(
@@ -45,12 +45,13 @@ fit_standard <- model$sample(
 )
 
 # Fit B-splines with different smoothing levels
-smoothing_levels <- c(0.01, 0.1, 0.5, 1.0)
+# Note: smoothing_strength scale: 0=none, 1=mild, 10=strong, 100=very strong
+smoothing_levels <- c(1, 5, 10, 100)
 fits_smooth <- list()
 
 for (i in seq_along(smoothing_levels)) {
-  tau <- smoothing_levels[i]
-  cat(sprintf("Fitting B-spline with tau = %.2f...\n", tau))
+  strength <- smoothing_levels[i]
+  cat(sprintf("Fitting B-spline with smoothing_strength = %.0f...\n", strength))
   
   stan_data_smooth <- list(
     n_data = n,
@@ -58,7 +59,7 @@ for (i in seq_along(smoothing_levels)) {
     y = y,
     num_knots = 15,
     spline_degree = 3,
-    tau_smooth = tau
+    smoothing_strength = strength
   )
   
   fits_smooth[[i]] <- model$sample(
@@ -97,13 +98,13 @@ df_standard$model <- "No smoothing"
 df_smooth_list <- list()
 for (i in seq_along(smoothing_levels)) {
   df_smooth_list[[i]] <- extract_fit(fits_smooth[[i]])
-  df_smooth_list[[i]]$model <- sprintf("τ = %.2f", smoothing_levels[i])
+  df_smooth_list[[i]]$model <- sprintf("Strength = %.0f", smoothing_levels[i])
 }
 
 # Combine all results
 df_all <- bind_rows(df_standard, df_smooth_list)
 df_all$model <- factor(df_all$model, 
-                      levels = c("No smoothing", sprintf("τ = %.2f", smoothing_levels)))
+                      levels = c("No smoothing", sprintf("Strength = %.0f", smoothing_levels)))
 
 # Create faceted plot
 p_smoothing <- ggplot(df_all, aes(x = x)) +
@@ -114,7 +115,7 @@ p_smoothing <- ggplot(df_all, aes(x = x)) +
   geom_line(data = data.frame(x = x, y = y_true), aes(x = x, y = y_true), 
             color = "red", linetype = "dashed", alpha = 0.7) +
   facet_wrap(~ model, ncol = 2, scales = "fixed") +
-  labs(title = "B-splines with Different Smoothing Levels",
+  labs(title = "B-splines with Different Smoothing Strengths",
        subtitle = "Blue: fitted spline with 95% CI, Red dashed: true function, Points: data",
        x = "x", y = "y") +
   theme_bw()
@@ -137,21 +138,21 @@ edf_standard <- calc_edf(fit_standard)
 edf_smooth <- sapply(fits_smooth, calc_edf)
 
 df_summary <- data.frame(
-  tau = c(0, smoothing_levels),
+  strength = c(0, smoothing_levels),
   wiggliness = c(edf_standard, edf_smooth),
-  model = c("No smoothing", sprintf("τ = %.2f", smoothing_levels))
+  model = c("No smoothing", sprintf("Strength = %.0f", smoothing_levels))
 )
 
-p_summary <- ggplot(df_summary, aes(x = tau, y = wiggliness)) +
+p_summary <- ggplot(df_summary, aes(x = strength, y = wiggliness)) +
   geom_point(size = 3) +
   geom_line() +
   geom_text(aes(label = model), hjust = -0.1, vjust = -0.5, size = 3) +
   labs(title = "Smoothing Effect on Wiggliness",
        subtitle = "Lower values indicate smoother fits",
-       x = "Smoothing parameter (τ)", 
+       x = "Smoothing strength", 
        y = "Wiggliness (sum of squared second differences)") +
   theme_bw() +
-  scale_x_continuous(limits = c(-0.1, 1.2))
+  scale_x_continuous(limits = c(-10, 110))
 
 # Combine plots
 combined_plot <- p_smoothing / p_summary + 
@@ -166,14 +167,15 @@ cat("\nPlot saved: output/bspline_smoothing_comparison.png\n")
 # Print diagnostics
 cat("\nModel comparison:\n")
 cat("=================\n")
-for (i in seq_along(c("No smoothing", sprintf("τ = %.2f", smoothing_levels)))) {
-  model_name <- c("No smoothing", sprintf("τ = %.2f", smoothing_levels))[i]
+for (i in seq_along(c("No smoothing", sprintf("Strength = %.0f", smoothing_levels)))) {
+  model_name <- c("No smoothing", sprintf("Strength = %.0f", smoothing_levels))[i]
   wiggliness <- df_summary$wiggliness[i]
-  cat(sprintf("%-15s: Wiggliness = %.3f\n", model_name, wiggliness))
+  cat(sprintf("%-20s: Wiggliness = %.3f\n", model_name, wiggliness))
 }
 
 cat("\nInterpretation:\n")
-cat("- No smoothing: Flexible fit that may overfit the data\n")
-cat("- Small τ (0.01): Very smooth, may underfit complex patterns\n")
-cat("- Medium τ (0.1-0.5): Balance between fit and smoothness\n")  
-cat("- Large τ (1.0): Less smoothing, more flexible fit\n")
+cat("- No smoothing (0): Flexible fit that may overfit the data\n")
+cat("- Mild smoothing (1): Slight smoothing, still quite flexible\n")
+cat("- Moderate smoothing (5): Good balance between fit and smoothness\n")  
+cat("- Strong smoothing (10): Smoother fit, may miss fine details\n")
+cat("- Very strong (100): Very smooth, may underfit complex patterns\n")

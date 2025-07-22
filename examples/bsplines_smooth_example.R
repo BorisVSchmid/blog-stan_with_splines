@@ -27,7 +27,7 @@ stan_data <- list(
   y = y,
   num_knots = 10,     # More knots but with smoothing
   spline_degree = 3,  
-  tau_smooth = 0.2    # Moderate smoothing
+  smoothing_strength = 5.0    # Moderate smoothing (was tau_smooth = 0.2)
 )
 
 # Compile and fit model
@@ -67,7 +67,7 @@ p <- ggplot(plot_data, aes(x = x)) +
     title = "B-spline Fit with Smoothing",
     subtitle = paste0("num_knots = ", stan_data$num_knots, 
                       ", degree = ", stan_data$spline_degree,
-                      ", tau_smooth = ", stan_data$tau_smooth),
+                      ", smoothing_strength = ", stan_data$smoothing_strength),
     x = "x",
     y = "y"
   ) +

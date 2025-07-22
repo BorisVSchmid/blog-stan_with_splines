@@ -43,7 +43,8 @@ source("run-code.R")
 source("run-examples.R")
 
 # Run test suite (verify implementations)
-source("run-tests.R")
+source("run-tests.R")       # Core tests only
+source("run-all-tests.R")   # Complete test suite
 ```
 
 For direct access to specific functionality:

@@ -1,50 +1,97 @@
 # Stan Splines Test Suite
 
-This directory contains comprehensive tests for the B-spline and C-spline implementations.
-
-## Test Organization
-
-### Core Tests (Run by default)
-- **test_basic_splines.R** - Basic functionality checks for both B-splines and C-splines
-- **test_numerical_accuracy.R** - Mathematical properties tests (partition of unity, linear interpolation)
-- **test_analytical_solutions.R** - Known function fitting tests
-
-### Diagnostic Tests
-- **test_diagnostics_both_splines.R** - Tests the smoothing diagnostics for both spline types
-- **test_edf_knot_response.R** - Tests effective degrees of freedom calculation
-- **test_smoothing_strength.R** - Demonstrates smoothing_strength parameter behavior
-
-### Special Case Tests
-- **test_3_knots.R** - Tests minimal knot configuration
-
-### Complex Tests (Run separately)
-- **test_splines.R** - Comprehensive tests with multiple function types
-- **test_regional_splines.R** - Hierarchical model tests
-- **test_regional_splines_simple.R** - Simplified regional model tests
+Comprehensive test suite for B-spline and C-spline implementations in Stan.
 
 ## Running Tests
 
-### Quick validation
+### Run ALL tests (recommended)
+From the project root directory:
+```bash
+Rscript run-all-tests.R
+```
+
+### Run core tests only (faster)
 ```bash
 Rscript run-tests.R
 ```
 
-### Simple test without groundhog dependencies
-```bash
-cd tests
-Rscript run_tests_simple.R
-```
-
-### Individual test
+### Run individual test
 ```bash
 cd tests
 Rscript test_basic_splines.R
 ```
 
-## Stan Model Files
+## Test Files Overview
 
-The tests use Stan models from the main `code/` directory:
-- `../code/bsplines.stan` - B-spline implementation
-- `../code/csplines.stan` - C-spline implementation
+### Core Functionality Tests
+- **test_basic_splines.R** - Essential functionality for both B-splines and C-splines
+- **test_3_knots.R** - Edge case testing with minimal knot configuration
 
-The only Stan file kept in this directory is test_regional_splines.stan which is used by the hierarchical model tests.
+### Mathematical Property Tests  
+- **test_numerical_accuracy.R** - Verifies mathematical properties (partition of unity, derivatives)
+- **test_analytical_solutions.R** - Tests against known analytical solutions
+
+### Parameter and Feature Tests
+- **test_smoothing_strength.R** - Tests the smoothing_strength parameter behavior
+- **test_edf_knot_response.R** - Tests effective degrees of freedom calculations
+- **test_diagnostics_both_splines.R** - Tests diagnostic functionality
+
+### Comprehensive Tests
+- **test_splines.R** - Extensive tests with multiple function types
+- **test_regional_splines.R** - Full hierarchical model implementation
+- **test_regional_splines_simple.R** - Simplified regional model for testing
+
+## Test Categories
+
+1. **Quick Tests** (<5 seconds each)
+   - Basic functionality
+   - Minimal configurations
+   - Parameter validation
+
+2. **Mathematical Tests** (5-20 seconds each)
+   - Numerical accuracy
+   - Analytical solutions
+   - Mathematical properties
+
+3. **Comprehensive Tests** (>20 seconds each)
+   - Multiple scenarios
+   - Regional/hierarchical models
+   - Extensive parameter sweeps
+
+## Dependencies
+
+Tests use the main implementations:
+- `code/bsplines.stan` - B-spline implementation with smoothing
+- `code/csplines.stan` - Natural cubic spline implementation
+- `code/smoothing_diagnostics.R` - Diagnostic functions
+
+The only Stan file in the tests directory is:
+- `test_regional_splines.stan` - Hierarchical spline model for testing
+
+## Expected Output
+
+Successful test runs will show:
+- Number of tests per file
+- Pass/fail status for each test
+- Timing information
+- Summary statistics
+
+Example output:
+```
+[1/10] Running test_basic_splines.R
+--------------------------------------------------
+✓ test_basic_splines.R completed in 12.3 seconds
+```
+
+## Troubleshooting
+
+If tests fail:
+1. Check that cmdstanr is properly installed
+2. Verify Stan models compile correctly
+3. Check for missing R packages
+4. Review specific error messages in test output
+
+Common issues:
+- **Compilation errors**: Update cmdstanr or check Stan syntax
+- **Numeric differences**: May need to adjust tolerance in tests
+- **Missing functions**: Source required files or install packages
