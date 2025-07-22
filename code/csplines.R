@@ -21,7 +21,7 @@ source("code/smoothing_diagnostics.R")
 set.seed(123)
 n <- 30
 x <- seq(0, 10, length.out = n)
-y_true <- sin(x) + 0.4 * cos(3*x) + 0.2*x
+y_true <- sin(x) + 0.4 * cos(3*x) + 0.25*x
 y <- y_true + rnorm(n, 0, 0.15)
 
 # Prepare data for Stan
@@ -29,7 +29,7 @@ stan_data <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 7       # Number of knots for natural cubic spline
+  num_knots = 5       # Number of knots for natural cubic spline
                       # - Use 4-6 knots for simple smooth curves
                       # - Use 7-10 knots for more complex patterns
                       # - C-splines are smoother than B-splines, so often need fewer knots
@@ -62,6 +62,9 @@ y_plot <- colMeans(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)])
 y_plot_lower <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.025)
 y_plot_upper <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.975)
 
+# Extract sigma for model diagnostics
+sigma <- mean(draws[, "sigma"])
+
 # Create data frames for plotting
 # Smooth fit data
 fit_data <- data.frame(
@@ -80,7 +83,7 @@ data_points <- data.frame(
 
 # High-resolution true function for smooth plotting
 x_true_hires <- seq(min(x), max(x), length.out = 1000)
-y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires) + 0.2*x_true_hires
+y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires) + 0.25*x_true_hires
 true_function_data <- data.frame(
   x = x_true_hires,
   y_true = y_true_hires
@@ -96,8 +99,9 @@ p <- ggplot() +
   scale_fill_manual(values = c("95% CI" = "darkgreen")) +
   labs(
     title = "C-spline (Natural Cubic Spline) Fit with 95% Credible Interval",
-    subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.2*x",
-    caption = paste0("Parameters: num_knots = ", stan_data$num_knots),
+    subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.25*x",
+    caption = paste0("Parameters: num_knots = ", stan_data$num_knots, 
+                     ", Estimated sigma = ", round(sigma, 3)),
     x = "x",
     y = "y"
   ) +

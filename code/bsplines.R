@@ -20,7 +20,7 @@ source("code/smoothing_diagnostics.R")
 set.seed(123)
 n <- 40
 x <- seq(0, 10, length.out = n)
-y_true <- sin(x) + 0.4 * cos(3*x) + 0.2*x 
+y_true <- sin(x) + 0.4 * cos(3*x) + 0.25*x 
 y <- y_true + rnorm(n, 0, 0.15)
 
 # Key features demonstration:
@@ -41,7 +41,7 @@ stan_data <- list(
   y = y,
   num_knots = adaptive_knots,     # Using adaptive selection
   spline_degree = 3,              # Cubic splines (most common)
-  smoothing_strength = 1.0,  # Default mild smoothing
+  smoothing_strength = 5.0,  # Default moderate-strong smoothing
   prior_scale = adaptive_prior    # Data-driven prior
 )
 
@@ -97,7 +97,7 @@ data_points <- data.frame(
 
 # High-resolution true function for smooth plotting
 x_true_hires <- seq(min(x), max(x), length.out = 1000)
-y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires) + 0.2*x_true_hires
+y_true_hires <- sin(x_true_hires) + 0.4 * cos(3*x_true_hires) + 0.25*x_true_hires
 true_function_data <- data.frame(
   x = x_true_hires,
   y_true = y_true_hires
@@ -113,7 +113,7 @@ p <- ggplot() +
   scale_fill_manual(values = c("95% CI" = "blue")) +
   labs(
     title = "B-spline Fit Demonstrating Key Features",
-    subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.2*x",
+    subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.25*x",
     caption = paste0("Parameters: Adaptive knots = ", stan_data$num_knots, 
                      ", Adaptive prior = ", round(stan_data$prior_scale, 1),
                      ", smoothing_strength = ", stan_data$smoothing_strength,
