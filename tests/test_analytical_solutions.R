@@ -5,6 +5,7 @@ library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::var)
 
 library(groundhog)
 stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
@@ -237,7 +238,7 @@ test_sine_wave <- function() {
     y = y,
     num_knots = 12,  # Need enough knots for oscillating function
     spline_degree = 3,
-    smoothing_strength = 100,  # Strong smoothing
+    smoothing_strength = 1,  # Mild smoothing for sine wave
     prior_scale = 2
   )
   

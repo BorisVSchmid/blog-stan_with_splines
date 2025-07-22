@@ -12,7 +12,7 @@ This directory contains comprehensive tests for the B-spline and C-spline implem
 ### Diagnostic Tests
 - **test_diagnostics_both_splines.R** - Tests the smoothing diagnostics for both spline types
 - **test_edf_knot_response.R** - Tests effective degrees of freedom calculation
-- **test_tau_smooth.R** - Demonstrates tau_smooth parameter behavior
+- **test_smoothing_strength.R** - Demonstrates smoothing_strength parameter behavior
 
 ### Special Case Tests
 - **test_3_knots.R** - Tests minimal knot configuration
