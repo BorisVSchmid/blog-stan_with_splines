@@ -39,6 +39,7 @@ test_cubic_polynomial <- function() {
   )
   
   model <- cmdstan_model("code/csplines.stan")
+  cat("  [Test 1 - C-spline cubic polynomial fitting] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
     chains = 1,
@@ -75,7 +76,7 @@ test_constant_function <- function() {
   n <- 12
   x <- seq(0, 10, length.out = n)
   constant_value <- 2.5
-  y <- rep(constant_value, n) + rnorm(n, 0, 0.02)
+  y <- rep(constant_value, n) + rnorm(n, 0, 0.05)  # Increased noise to avoid sigma approaching 0
   
   results <- list()
   
@@ -92,14 +93,19 @@ test_constant_function <- function() {
   )
   
   model_b <- cmdstan_model("code/bsplines.stan")
+  cat("  [Test 2 - B-spline constant function fitting] Fitting model...\n")
   fit_b <- model_b$sample(
     data = stan_data_b,
     chains = 1,
-    iter_warmup = 200,
-    iter_sampling = 400,
+    iter_warmup = 500,
+    iter_sampling = 600,
     refresh = 0,
-    adapt_delta = 0.95,  # Higher to handle low noise case
-    init = function() list(sigma = 0.1)  # Initialize sigma away from 0
+    adapt_delta = 0.98,  # Even higher for constant function with low noise
+    init = function() list(
+      alpha_0 = mean(y),
+      alpha_raw = rnorm(stan_data_b$num_knots + stan_data_b$spline_degree - 1, 0, 0.1),
+      sigma = 0.1  # Initialize sigma away from 0
+    )
   )
   
   draws_b <- fit_b$draws(format = "matrix")
@@ -118,6 +124,7 @@ test_constant_function <- function() {
   )
   
   model_c <- cmdstan_model("code/csplines.stan")
+  cat("  [Test 2 - C-spline constant function fitting] Fitting model...\n")
   fit_c <- model_c$sample(
     data = stan_data_c,
     chains = 1,
@@ -125,7 +132,10 @@ test_constant_function <- function() {
     iter_sampling = 400,
     refresh = 0,
     adapt_delta = 0.95,  # Higher to handle low noise case
-    init = function() list(sigma = 0.1)  # Initialize sigma away from 0
+    init = function() list(
+      y_at_knots = rep(mean(y), stan_data_c$num_knots),
+      sigma = 0.1  # Initialize sigma away from 0
+    )
   )
   
   draws_c <- fit_c$draws(format = "matrix")
@@ -250,9 +260,10 @@ test_sine_wave <- function() {
   fit_b <- model_b$sample(
     data = stan_data_b,
     chains = 1,
-    iter_warmup = 300,
-    iter_sampling = 500,
-    refresh = 0
+    iter_warmup = 500,
+    iter_sampling = 700,
+    refresh = 0,
+    adapt_delta = 0.95
   )
   
   draws_b <- fit_b$draws(format = "matrix")
@@ -276,9 +287,10 @@ test_sine_wave <- function() {
   fit_c <- model_c$sample(
     data = stan_data_c,
     chains = 1,
-    iter_warmup = 300,
-    iter_sampling = 500,
-    refresh = 0
+    iter_warmup = 500,
+    iter_sampling = 700,
+    refresh = 0,
+    adapt_delta = 0.95
   )
   
   draws_c <- fit_c$draws(format = "matrix")
@@ -306,54 +318,54 @@ test_sine_wave <- function() {
 cat("Stan Splines - Analytical Solutions Test Suite\n")
 cat("==============================================\n")
 
-test_results <- list()
+analytical_test_results <- list()
 
 # Run tests with error handling
 tryCatch({
-  test_results$cubic_polynomial <- test_cubic_polynomial()
+  analytical_test_results$cubic_polynomial <- test_cubic_polynomial()
 }, error = function(e) {
   cat("Error in cubic polynomial test:", e$message, "\n")
-  test_results$cubic_polynomial <<- FALSE
+  analytical_test_results$cubic_polynomial <<- FALSE
 })
 
 tryCatch({
-  test_results$constant_function <- test_constant_function()
+  analytical_test_results$constant_function <- test_constant_function()
 }, error = function(e) {
   cat("Error in constant function test:", e$message, "\n")
-  test_results$constant_function <<- list(b_spline = FALSE, c_spline = FALSE)
+  analytical_test_results$constant_function <<- list(b_spline = FALSE, c_spline = FALSE)
 })
 
 tryCatch({
-  test_results$step_function <- test_step_function()
+  analytical_test_results$step_function <- test_step_function()
 }, error = function(e) {
   cat("Error in step function test:", e$message, "\n")
-  test_results$step_function <<- FALSE
+  analytical_test_results$step_function <<- FALSE
 })
 
 tryCatch({
-  test_results$sine_wave <- test_sine_wave()
+  analytical_test_results$sine_wave <- test_sine_wave()
 }, error = function(e) {
   cat("Error in sine wave test:", e$message, "\n")
-  test_results$sine_wave <<- list(b_spline = FALSE, c_spline = FALSE)
+  analytical_test_results$sine_wave <<- list(b_spline = FALSE, c_spline = FALSE)
 })
 
 # Summary
 cat("\n\nAnalytical Solutions Test Summary\n")
 cat("=================================\n")
-cat("Cubic polynomial (C-splines):", ifelse(test_results$cubic_polynomial, "PASS", "FAIL"), "\n")
-cat("Constant function (B-splines):", ifelse(test_results$constant_function$b_spline, "PASS", "FAIL"), "\n")
-cat("Constant function (C-splines):", ifelse(test_results$constant_function$c_spline, "PASS", "FAIL"), "\n")
-cat("Step function approximation:", ifelse(test_results$step_function, "PASS", "FAIL"), "\n")
-cat("Sine wave (B-splines):", ifelse(test_results$sine_wave$b_spline, "PASS", "FAIL"), "\n")
-cat("Sine wave (C-splines):", ifelse(test_results$sine_wave$c_spline, "PASS", "FAIL"), "\n")
+cat("Cubic polynomial (C-splines):", ifelse(analytical_test_results$cubic_polynomial, "PASS", "FAIL"), "\n")
+cat("Constant function (B-splines):", ifelse(analytical_test_results$constant_function$b_spline, "PASS", "FAIL"), "\n")
+cat("Constant function (C-splines):", ifelse(analytical_test_results$constant_function$c_spline, "PASS", "FAIL"), "\n")
+cat("Step function approximation:", ifelse(analytical_test_results$step_function, "PASS", "FAIL"), "\n")
+cat("Sine wave (B-splines):", ifelse(analytical_test_results$sine_wave$b_spline, "PASS", "FAIL"), "\n")
+cat("Sine wave (C-splines):", ifelse(analytical_test_results$sine_wave$c_spline, "PASS", "FAIL"), "\n")
 
 # Overall result
-all_passed <- test_results$cubic_polynomial &&
-              test_results$constant_function$b_spline &&
-              test_results$constant_function$c_spline &&
-              test_results$step_function &&
-              test_results$sine_wave$b_spline &&
-              test_results$sine_wave$c_spline
+all_passed <- analytical_test_results$cubic_polynomial &&
+              analytical_test_results$constant_function$b_spline &&
+              analytical_test_results$constant_function$c_spline &&
+              analytical_test_results$step_function &&
+              analytical_test_results$sine_wave$b_spline &&
+              analytical_test_results$sine_wave$c_spline
 
 cat("\nOverall Result:", ifelse(all_passed, "ALL TESTS PASSED", "SOME TESTS FAILED"), "\n")
 

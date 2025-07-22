@@ -181,9 +181,9 @@ model {
 
 generated quantities {
   // Predictions for each region on a fine grid
-  array[100] real x_plot;
-  matrix[num_basis, 100] B_plot;
-  array[n_regions] vector[100] y_plot;
+  array[1000] real x_plot;
+  matrix[num_basis, 1000] B_plot;
+  array[n_regions] vector[1000] y_plot;
   
   // Variance components
   real var_between = variance(beta_region);
@@ -194,8 +194,8 @@ generated quantities {
   real x_min = min(x);
   real x_max = max(x);
   
-  for (i in 1:100) {
-    x_plot[i] = x_min + (x_max - x_min) * (i - 1.0) / 99.0;
+  for (i in 1:1000) {
+    x_plot[i] = x_min + (x_max - x_min) * (i - 1.0) / 999.0;
   }
   
   // Build basis for plotting

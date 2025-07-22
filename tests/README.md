@@ -16,25 +16,25 @@ cd tests
 Rscript test_basic_splines.R
 ```
 
-## Test Files Overview
+## Test Files (10 total)
 
-### Core Functionality Tests
-- **test_basic_splines.R** - Essential functionality for both B-splines and C-splines
-- **test_3_knots.R** - Edge case testing with minimal knot configuration
+### Core Functionality Tests (2)
+1. **test_basic_splines.R** - Essential functionality for both B-splines and C-splines
+2. **test_3_knots.R** - Edge case testing with minimal knot configuration
 
-### Mathematical Property Tests  
-- **test_numerical_accuracy.R** - Verifies mathematical properties (partition of unity, derivatives)
-- **test_analytical_solutions.R** - Tests against known analytical solutions
+### Mathematical Property Tests (2)
+3. **test_numerical_accuracy.R** - Verifies mathematical properties (partition of unity, interpolation)
+4. **test_analytical_solutions.R** - Tests against known analytical solutions (constant, cubic, sine)
 
-### Parameter and Feature Tests
-- **test_smoothing_strength.R** - Tests the smoothing_strength parameter behavior
-- **test_edf_knot_response.R** - Tests effective degrees of freedom calculations
-- **test_diagnostics_both_splines.R** - Tests diagnostic functionality
+### Parameter and Feature Tests (3)
+5. **test_smoothing_strength.R** - Tests the smoothing_strength parameter behavior
+6. **test_edf_knot_response.R** - Tests effective degrees of freedom calculations  
+7. **test_diagnostics_both_splines.R** - Tests diagnostic functionality
 
-### Comprehensive Tests
-- **test_splines.R** - Extensive tests with multiple function types
-- **test_regional_splines.R** - Full hierarchical model implementation
-- **test_regional_splines_simple.R** - Simplified regional model for testing
+### Advanced Tests (3)
+8. **test_splines.R** - Extensive tests with multiple function types and performance comparison
+9. **test_regional_splines_simple.R** - Simplified regional model for testing
+10. **test_regional_splines.R** - Full hierarchical model implementation
 
 ## Test Categories
 

@@ -84,17 +84,10 @@ draws <- fit$draws(format = "matrix")
 
 # Extract predictions for each region
 plot_data <- list()
-
-
 for (r in 1:3) {
   x_plot <- colMeans(draws[, grep("x_plot\\[", colnames(draws), value = TRUE)])
-  # Stan outputs array[n_regions] vector[1000] as y_plot[r,i] format
-  # Use regex pattern to match y_plot[r,*] where * is any number
-  y_plot_cols <- grep(paste0("^y_plot\\[", r, ",\\d+\\]$"), colnames(draws), value = TRUE)
-  
-  if (length(y_plot_cols) == 0) {
-    stop(paste("ERROR: No y_plot columns found for region", r))
-  }
+  # y_plot is indexed as y_plot[region][point] in Stan
+  y_plot_cols <- grep(paste0("y_plot\\[", r, "\\]\\["), colnames(draws), value = TRUE)
   
   y_plot_mean <- colMeans(draws[, y_plot_cols])
   y_plot_lower <- apply(draws[, y_plot_cols], 2, quantile, 0.025)
@@ -182,32 +175,53 @@ p3 <- ggplot(var_df, aes(x = component, y = variance, fill = component)) +
   theme(legend.position = "none") +
   scale_fill_brewer(palette = "Set3")
 
-# Save outputs
-dir.create("output", showWarnings = FALSE)
-
-# Combine plots using patchwork
+# Combine plots
 combined_plot <- (p1 | (p2 / p3)) + 
   plot_layout(widths = c(2, 1))
 
-# Save combined visualization
-ggsave("output/regional_splines_comprehensive.png", combined_plot, 
+# Save outputs
+dir.create("output", showWarnings = FALSE)
+ggsave("output/regional_splines_fit.png", combined_plot, 
        width = 14, height = 10, dpi = 300)
 
-# Also save individual plots for detailed examination
-ggsave("output/regional_splines_fits.png", p1, 
-       width = 8, height = 10, dpi = 300)
-
-ggsave("output/regional_splines_coefficients.png", p2, 
-       width = 6, height = 5, dpi = 300)
-
-ggsave("output/regional_splines_variance.png", p3, 
-       width = 6, height = 5, dpi = 300)
+# Individual region plots with basis functions
+for (r in 1:3) {
+  # Extract basis function values for this region
+  basis_cols <- grep(paste0("basis_functions\\[\\d+,", r, "\\]"), 
+                     colnames(draws), value = TRUE)
+  
+  if (length(basis_cols) > 0) {
+    # Get x_plot values
+    x_plot <- colMeans(draws[, grep("x_plot\\[", colnames(draws), value = TRUE)])
+    
+    # Create basis function plot
+    basis_df <- data.frame(x = rep(x_plot, length(basis_cols)))
+    
+    for (i in seq_along(basis_cols)) {
+      col_name <- paste0("B", i)
+      basis_df[[col_name]] <- colMeans(draws[, basis_cols[i]])
+    }
+    
+    basis_long <- basis_df %>%
+      pivot_longer(cols = starts_with("B"), 
+                   names_to = "basis", 
+                   values_to = "value")
+    
+    p_basis <- ggplot(basis_long, aes(x = x, y = value, color = basis)) +
+      geom_line(linewidth = 0.8) +
+      labs(title = paste("B-spline Basis Functions -", c("Region A", "Region B", "Region C")[r]),
+           x = "x", y = "Basis Function Value") +
+      theme_minimal() +
+      theme(legend.position = "none")
+    
+    ggsave(paste0("output/regional_basis_region", r, ".png"), 
+           p_basis, width = 8, height = 6, dpi = 300)
+  }
+}
 
 cat("\nOutputs saved:\n")
-cat("- output/regional_splines_comprehensive.png (combined visualization)\n")
-cat("- output/regional_splines_fits.png (individual region fits)\n")
-cat("- output/regional_splines_coefficients.png (global coefficients)\n")
-cat("- output/regional_splines_variance.png (variance decomposition)\n")
+cat("- output/regional_splines_fit.png\n")
+cat("- output/regional_basis_region[1-3].png (if basis functions were extracted)\n")
 
 # Print regional effects
 beta_region <- colMeans(draws[, grep("beta_region\\[", colnames(draws), value = TRUE)])
@@ -222,42 +236,3 @@ cat("\nSmoothness parameters (lambda):\n")
 for (i in 1:3) {
   cat(sprintf("  Region %s: %.3f\n", c("A", "B", "C")[i], lambda_means[i]))
 }
-
-# Additional diagnostics from the full version
-# Extract basis function values for detailed analysis
-cat("\n\nDetailed Basis Function Analysis:\n")
-cat("==================================\n")
-
-for (r in 1:3) {
-  # Extract basis function values for this region
-  basis_cols <- grep(paste0("basis_functions\\[\\d+,", r, "\\]"), 
-                     colnames(draws), value = TRUE)
-  
-  if (length(basis_cols) > 0) {
-    cat(sprintf("\nRegion %s:\n", c("A", "B", "C")[r]))
-    cat(sprintf("  Number of basis functions: %d\n", length(basis_cols)))
-    
-    # Check sparsity (how many basis functions are effectively zero)
-    basis_means <- colMeans(draws[, basis_cols])
-    near_zero <- sum(abs(basis_means) < 0.01)
-    cat(sprintf("  Basis functions near zero: %d (%.1f%%)\n", 
-                near_zero, 100 * near_zero / length(basis_cols)))
-  }
-}
-
-# Model diagnostics
-cat("\n\nModel Diagnostics:\n")
-cat("==================\n")
-diagnostics <- fit$diagnostic_summary()
-cat("Divergences:", sum(diagnostics$num_divergent), "\n")
-cat("Max treedepth exceeded:", sum(diagnostics$num_max_treedepth), "\n")
-cat("E-BFMI:", round(min(diagnostics$ebfmi), 3), "\n")
-
-# Print effective sample sizes for key parameters
-ess <- fit$summary(c("mu_alpha", "tau_alpha", "sigma"))$ess_bulk
-cat("\nEffective sample sizes (bulk):\n")
-cat("  mu_alpha:", round(min(ess[grep("mu_alpha", names(ess))]), 0), "-",
-    round(max(ess[grep("mu_alpha", names(ess))]), 0), "\n")
-cat("  tau_alpha:", round(min(ess[grep("tau_alpha", names(ess))]), 0), "-",
-    round(max(ess[grep("tau_alpha", names(ess))]), 0), "\n")
-cat("  sigma:", round(ess["sigma"], 0), "\n")

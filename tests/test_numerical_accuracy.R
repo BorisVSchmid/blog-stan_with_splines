@@ -49,13 +49,16 @@ test_bspline_partition_unity <- function() {
     )
   }
   
+  cat("  [Test 1 - B-spline partition of unity] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
     init = init_fun,
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 500,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,
+    max_treedepth = 15  # Increase to avoid hitting max treedepth
   )
   
   draws <- fit$draws(format = "matrix")
@@ -111,13 +114,16 @@ test_linear_interpolation <- function() {
     )
   }
   
+  cat("  [Test 2 - B-spline linear interpolation] Fitting model...\n")
   fit_b <- model_b$sample(
     data = stan_data_b,
     init = init_fun_b,
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 500,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,
+    max_treedepth = 15  # Increase to avoid hitting max treedepth
   )
   
   draws_b <- fit_b$draws(format = "matrix")
@@ -137,12 +143,15 @@ test_linear_interpolation <- function() {
   )
   
   model_c <- cmdstan_model("code/csplines.stan")
+  cat("  [Test 2 - C-spline linear interpolation] Fitting model...\n")
   fit_c <- model_c$sample(
     data = stan_data_c,
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 500,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,
+    max_treedepth = 15  # Increase to avoid hitting max treedepth
   )
   
   draws_c <- fit_c$draws(format = "matrix")
@@ -185,12 +194,15 @@ test_interpolation_accuracy <- function() {
   )
   
   model <- cmdstan_model("code/csplines.stan")
+  cat("  [Test 3 - C-spline second derivative smoothness] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 500,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,
+    max_treedepth = 15  # Increase to avoid hitting max treedepth
   )
   
   draws <- fit$draws(format = "matrix")
@@ -233,6 +245,7 @@ test_monotonicity <- function() {
   )
   
   model <- cmdstan_model("code/csplines.stan")
+  cat("  [Test 4 - C-spline monotonicity preservation] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
     chains = 1,
@@ -240,7 +253,7 @@ test_monotonicity <- function() {
     iter_sampling = 500,
     refresh = 0,
     adapt_delta = 0.95,  # Increase to avoid divergences
-    max_treedepth = 12   # Increase to avoid hitting max treedepth
+    max_treedepth = 15   # Further increase to avoid hitting max treedepth
   )
   
   draws <- fit$draws(format = "matrix")

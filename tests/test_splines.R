@@ -6,6 +6,7 @@ library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::sd)
 
 library(groundhog)
 # Note: cmdstanr must be installed from Stan repo
@@ -222,12 +223,12 @@ all_plots <- list()
 cat("Test 1: Sine function\n")
 data_sine <- generate_test_data(n = 30, func_type = "sine", noise_sd = 0.1)
 
-cat("  Fitting B-spline model...\n")
+cat("  [Test 1 - B-spline sine function] Fitting model...\n")
 fit_b_sine <- fit_bspline(data_sine, num_knots = 7, spline_degree = 3)
 diag_b_sine <- check_diagnostics(fit_b_sine, "B-spline (sine)")
 plots_b_sine <- plot_spline_fit(fit_b_sine, data_sine, "B-spline", show_basis = TRUE)
 
-cat("\n  Fitting C-spline model...\n")
+cat("\n  [Test 1 - C-spline sine function] Fitting model...\n")
 fit_c_sine <- fit_cspline(data_sine, num_knots = 7)
 diag_c_sine <- check_diagnostics(fit_c_sine, "C-spline (sine)")
 plots_c_sine <- plot_spline_fit(fit_c_sine, data_sine, "C-spline")
@@ -236,12 +237,12 @@ plots_c_sine <- plot_spline_fit(fit_c_sine, data_sine, "C-spline")
 cat("\n\nTest 2: Polynomial function\n")
 data_poly <- generate_test_data(n = 40, func_type = "polynomial", noise_sd = 0.5)
 
-cat("  Fitting B-spline model...\n")
+cat("  [Test 2 - B-spline polynomial function] Fitting model...\n")
 fit_b_poly <- fit_bspline(data_poly, num_knots = 5, spline_degree = 3)
 diag_b_poly <- check_diagnostics(fit_b_poly, "B-spline (polynomial)")
 plots_b_poly <- plot_spline_fit(fit_b_poly, data_poly, "B-spline")
 
-cat("\n  Fitting C-spline model...\n")
+cat("\n  [Test 2 - C-spline polynomial function] Fitting model...\n")
 fit_c_poly <- fit_cspline(data_poly, num_knots = 5)
 diag_c_poly <- check_diagnostics(fit_c_poly, "C-spline (polynomial)")
 plots_c_poly <- plot_spline_fit(fit_c_poly, data_poly, "C-spline")
@@ -250,12 +251,12 @@ plots_c_poly <- plot_spline_fit(fit_c_poly, data_poly, "C-spline")
 cat("\n\nTest 3: Complex function (sin + cos)\n")
 data_complex <- generate_test_data(n = 50, func_type = "complex", noise_sd = 0.1)
 
-cat("  Fitting B-spline model...\n")
+cat("  [Test 3 - B-spline complex function] Fitting model...\n")
 fit_b_complex <- fit_bspline(data_complex, num_knots = 10, spline_degree = 3)
 diag_b_complex <- check_diagnostics(fit_b_complex, "B-spline (complex)")
 plots_b_complex <- plot_spline_fit(fit_b_complex, data_complex, "B-spline")
 
-cat("\n  Fitting C-spline model...\n")
+cat("\n  [Test 3 - C-spline complex function] Fitting model...\n")
 fit_c_complex <- fit_cspline(data_complex, num_knots = 10)
 diag_c_complex <- check_diagnostics(fit_c_complex, "C-spline (complex)")
 plots_c_complex <- plot_spline_fit(fit_c_complex, data_complex, "C-spline")
@@ -288,9 +289,9 @@ cat("\n\n=== Testing edge cases ===\n")
 
 # Test 4: Minimal data (n = 5)
 cat("\nTest 4: Minimal data points (n=5)\n")
-data_minimal <- generate_test_data(n = 5, func_type = "linear", noise_sd = 0.05)
+data_minimal <- generate_test_data(n = 5, func_type = "linear", noise_sd = 0.1)  # Increased noise to avoid sigma approaching 0
 
-cat("  Fitting B-spline model with 3 knots...\n")
+cat("  [Test 4 - B-spline minimal data] Fitting model with 3 knots...\n")
 tryCatch({
   fit_b_minimal <- fit_bspline(data_minimal, num_knots = 3, spline_degree = 2)
   diag_b_minimal <- check_diagnostics(fit_b_minimal, "B-spline (minimal)")
@@ -299,7 +300,7 @@ tryCatch({
   cat("  Error:", e$message, "\n")
 })
 
-cat("\n  Fitting C-spline model with 3 knots...\n")
+cat("\n  [Test 4 - C-spline minimal data] Fitting model with 3 knots...\n")
 tryCatch({
   fit_c_minimal <- fit_cspline(data_minimal, num_knots = 3)
   diag_c_minimal <- check_diagnostics(fit_c_minimal, "C-spline (minimal)")
@@ -314,7 +315,7 @@ data_test <- generate_test_data(n = 30, func_type = "sine", noise_sd = 0.1)
 
 degree_plots <- list()
 for (degree in c(2, 3, 4)) {
-  cat(paste0("\n  Testing B-spline with degree ", degree, "...\n"))
+  cat(paste0("\n  [Test 5 - B-spline degree ", degree, "] Fitting model...\n"))
   tryCatch({
     fit_b_degree <- fit_bspline(data_test, num_knots = 6, spline_degree = degree, 
                                 chains = 2, iter_warmup = 300, iter_sampling = 500)
@@ -361,11 +362,13 @@ cat("Comparing computation time for B-splines vs C-splines\n")
 
 data_perf <- generate_test_data(n = 100, func_type = "complex", noise_sd = 0.1)
 
+cat("  [Performance - B-spline timing] Fitting model...\n")
 time_b <- system.time({
   fit_b_perf <- fit_bspline(data_perf, num_knots = 8, chains = 2, 
                             iter_warmup = 500, iter_sampling = 1000)
 })
 
+cat("  [Performance - C-spline timing] Fitting model...\n")
 time_c <- system.time({
   fit_c_perf <- fit_cspline(data_perf, num_knots = 8, chains = 2, 
                             iter_warmup = 500, iter_sampling = 1000)
