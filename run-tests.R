@@ -45,6 +45,14 @@ test_results <- list()
 test_times <- list()
 test_details <- list()
 
+# Initialize all tests with "NOT RUN" status
+for (test_file in all_tests) {
+  test_name <- basename(test_file)
+  test_results[[test_name]] <- "NOT RUN"
+  test_times[[test_name]] <- 0
+  test_details[[test_name]] <- character()
+}
+
 # Run each test
 for (i in seq_along(all_tests)) {
   test_file <- all_tests[i]

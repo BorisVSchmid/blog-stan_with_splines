@@ -97,7 +97,9 @@ test_constant_function <- function() {
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 400,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,  # Higher to handle low noise case
+    init = function() list(sigma = 0.1)  # Initialize sigma away from 0
   )
   
   draws_b <- fit_b$draws(format = "matrix")
@@ -121,7 +123,9 @@ test_constant_function <- function() {
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 400,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,  # Higher to handle low noise case
+    init = function() list(sigma = 0.1)  # Initialize sigma away from 0
   )
   
   draws_c <- fit_c$draws(format = "matrix")

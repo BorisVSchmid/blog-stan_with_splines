@@ -51,11 +51,13 @@ fit_bspline <- function(data, num_knots = 5, spline_degree = 3,
     x = data$x,
     y = data$y,
     num_knots = num_knots,
-    spline_degree = spline_degree
+    spline_degree = spline_degree,
+    smoothing_strength = 1.0,  # Default mild smoothing
+    prior_scale = 2 * sd(data$y)  # Adaptive prior
   )
   
   # Compile model if needed
-  model <- cmdstan_model("test_bsplines.stan")
+  model <- cmdstan_model("code/bsplines.stan")
   
   # Fit model
   fit <- model$sample(
@@ -82,7 +84,7 @@ fit_cspline <- function(data, num_knots = 5,
   )
   
   # Compile model if needed
-  model <- cmdstan_model("test_csplines.stan")
+  model <- cmdstan_model("code/csplines.stan")
   
   # Fit model
   fit <- model$sample(

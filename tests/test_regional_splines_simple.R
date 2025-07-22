@@ -53,7 +53,7 @@ stan_data <- list(
 
 # Compile and fit model
 cat("Compiling regional splines model...\n")
-model <- cmdstan_model("test_regional_splines.stan")
+model <- cmdstan_model("tests/test_regional_splines.stan")
 
 cat("Fitting model with hierarchical priors...\n")
 fit <- model$sample(
