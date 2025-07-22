@@ -3,23 +3,30 @@
 
 functions {
   // B-spline basis function
-  vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order) {
+  vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
     vector[size(t)] b_spline;
     vector[size(t)] w1 = rep_vector(0, size(t));
     vector[size(t)] w2 = rep_vector(0, size(t));
     
     if (order==1)
-      for (i in 1:size(t))
-        b_spline[i] = (ext_knots[ind] <= t[i]) && (t[i] < ext_knots[ind+1]);
+      for (i in 1:size(t)) {
+        // For the rightmost data point, assign it to the last non-zero interval
+        if (t[i] >= ext_knots[size(ext_knots) - degree] && 
+            ind == size(ext_knots) - degree - 1) {
+          b_spline[i] = 1;
+        } else {
+          b_spline[i] = (ext_knots[ind] <= t[i]) && (t[i] < ext_knots[ind+1]);
+        }
+      }
     else {
-      if (ext_knots[ind] != ext_knots[ind+order-1])
+      if (abs(ext_knots[ind] - ext_knots[ind+order-1]) > 1e-10)
         w1 = (to_vector(t) - rep_vector(ext_knots[ind], size(t))) /
              (ext_knots[ind+order-1] - ext_knots[ind]);
-      if (ext_knots[ind+1] != ext_knots[ind+order])
+      if (abs(ext_knots[ind+1] - ext_knots[ind+order]) > 1e-10)
         w2 = 1 - (to_vector(t) - rep_vector(ext_knots[ind+1], size(t))) /
                  (ext_knots[ind+order] - ext_knots[ind+1]);
-      b_spline = w1 .* build_b_spline(t, ext_knots, ind, order-1) +
-                 w2 .* build_b_spline(t, ext_knots, ind+1, order-1);
+      b_spline = w1 .* build_b_spline(t, ext_knots, ind, order-1, degree) +
+                 w2 .* build_b_spline(t, ext_knots, ind+1, order-1, degree);
     }
     return b_spline;
   }
@@ -35,12 +42,22 @@ data {
   // Spline parameters
   int<lower=1> num_knots;                  // Number of interior knots
   int<lower=1> spline_degree;              // Degree of spline (3 for cubic)
+  real<lower=0> smoothing_strength;        // Smoothing strength (0=none, 1=mild, 10=strong)
+  real<lower=0> prior_scale;               // Scale for coefficient priors
 }
 
 transformed data {
   // Calculate dimensions
   int num_basis = num_knots + spline_degree - 1;
   int spline_order = spline_degree + 1;
+  
+  // Transform smoothing_strength to tau_smooth
+  real tau_smooth;
+  if (smoothing_strength == 0) {
+    tau_smooth = 0;  // Special case: independent coefficients
+  } else {
+    tau_smooth = 1 / sqrt(smoothing_strength);  // Convert to SD scale
+  }
   
   // Set up knots
   vector[num_knots] knots;
@@ -80,7 +97,7 @@ transformed data {
   
   // Build B-spline basis matrix
   for (i in 1:num_basis) {
-    B[i, :] = to_row_vector(build_b_spline(x, ext_knots_arr, i, spline_order));
+    B[i, :] = to_row_vector(build_b_spline(x, ext_knots_arr, i, spline_order, spline_degree));
   }
   
   print("Regional B-spline setup:");
@@ -90,11 +107,11 @@ transformed data {
 }
 
 parameters {
-  // Regional spline coefficients
-  array[n_regions] row_vector[num_basis] alpha;
+  // Raw coefficients for non-centered parameterization
+  array[n_regions] row_vector[num_basis] alpha_raw;
   
   // Hierarchical priors for spline coefficients
-  row_vector[num_basis] mu_alpha;              // Global mean
+  row_vector[num_basis] mu_alpha_raw;          // Global mean (raw)
   vector<lower=0>[num_basis] tau_alpha;        // Global SD
   
   // Shared noise parameter
@@ -107,6 +124,32 @@ parameters {
 }
 
 transformed parameters {
+  // Apply random walk smoothing to get actual coefficients
+  array[n_regions] row_vector[num_basis] alpha;
+  row_vector[num_basis] mu_alpha;
+  
+  // Apply smoothing based on tau_smooth value
+  if (tau_smooth == 0) {
+    // No smoothing - independent coefficients
+    mu_alpha = mu_alpha_raw * prior_scale;
+    for (r in 1:n_regions) {
+      alpha[r] = alpha_raw[r] .* tau_alpha';
+    }
+  } else {
+    // Random walk smoothing
+    mu_alpha[1] = mu_alpha_raw[1] * prior_scale;
+    for (j in 2:num_basis) {
+      mu_alpha[j] = mu_alpha[j-1] + mu_alpha_raw[j] * tau_smooth;
+    }
+    
+    for (r in 1:n_regions) {
+      alpha[r][1] = alpha_raw[r][1] * tau_alpha[1];
+      for (j in 2:num_basis) {
+        alpha[r][j] = alpha[r][j-1] + alpha_raw[r][j] * tau_smooth * tau_alpha[j];
+      }
+    }
+  }
+  
   // Compute fitted values for each observation
   vector[n_total] y_hat;
   
@@ -116,21 +159,21 @@ transformed parameters {
 }
 
 model {
-  // Hierarchical priors for spline coefficients
-  mu_alpha ~ normal(0, 2);
-  tau_alpha ~ normal(0, 1);
+  // Priors for raw coefficients (non-centered parameterization)
+  mu_alpha_raw ~ std_normal();
+  tau_alpha ~ normal(0, prior_scale);
   
   for (r in 1:n_regions) {
-    alpha[r] ~ normal(mu_alpha, tau_alpha);
+    alpha_raw[r] ~ std_normal();
   }
   
   // Priors for regional effects
-  mu_beta ~ normal(0, 1);
-  sigma_beta ~ normal(0, 0.5);
+  mu_beta ~ normal(mean(y), fmax(sd(y), 0.1 * fmax(abs(mean(y)), 1.0)));
+  sigma_beta ~ exponential(2);
   beta_region ~ normal(mu_beta, sigma_beta);
   
   // Shared noise prior
-  sigma ~ normal(0, 0.5);
+  sigma ~ exponential(2);
   
   // Likelihood
   y ~ normal(y_hat, sigma);
@@ -157,7 +200,7 @@ generated quantities {
   
   // Build basis for plotting
   for (i in 1:num_basis) {
-    B_plot[i, :] = to_row_vector(build_b_spline(x_plot, ext_knots_arr, i, spline_order));
+    B_plot[i, :] = to_row_vector(build_b_spline(x_plot, ext_knots_arr, i, spline_order, spline_degree));
   }
   
   // Evaluate spline for each region

@@ -1,10 +1,10 @@
-# Minimal B-spline example demonstrating key features
+# Test B-splines with 3 knots
 
 library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
-conflicts_prefer(stats::sd)  # Use base R sd, not posterior::sd
+conflicts_prefer(stats::sd)
 
 library(groundhog)
 stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
@@ -12,8 +12,6 @@ pkgs <- c("dplyr", "ggplot2", "patchwork")
 groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
 
 library(cmdstanr)
-
-# Source smoothing diagnostics
 source("code/smoothing_diagnostics.R")
 
 # Generate test data with complex function
@@ -23,36 +21,23 @@ x <- seq(0, 10, length.out = n)
 y_true <- sin(x) + 0.4 * cos(3*x) + 0.2*x 
 y <- y_true + rnorm(n, 0, 0.15)
 
-# Key features demonstration:
-# 1. Adaptive knot selection based on data size
-# Rule of thumb: n/4 for B-splines (with smoothing)
-adaptive_knots <- max(4, min(round(n/4), 40))
-
-# 2. Adaptive prior scale based on data variance
-adaptive_prior <- 2 * sd(y)
-
-# 3. Default mild smoothing for more stable fits
-# smoothing_strength: 0=none, 1=mild, 10=strong
-
-# Prepare data for Stan
+# Force 3 knots
 stan_data <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = adaptive_knots,     # Using adaptive selection
-  spline_degree = 3,              # Cubic splines (most common)
-  smoothing_strength = 1.0,  # Default mild smoothing
-  prior_scale = adaptive_prior    # Data-driven prior
+  num_knots = 3,  # Minimal knots
+  spline_degree = 3,
+  smoothing_strength = 1.0,
+  prior_scale = 2 * sd(y)
 )
 
 # Compile and fit model
-cat("Compiling B-spline model...\n")
-model <- cmdstan_model("code/bsplines.stan")
+cat("Testing B-splines with 3 knots\n")
+cat("==============================\n")
+cat("Number of basis functions: 3 + 3 - 1 = 5\n\n")
 
-cat("Fitting model with:\n")
-cat("  - Adaptive knots:", adaptive_knots, "(based on n =", n, ")\n")
-cat("  - Prior scale:", round(adaptive_prior, 2), "(based on data variance)\n")
-cat("  - Smoothing strength:", stan_data$smoothing_strength, "\n\n")
+model <- cmdstan_model("code/bsplines.stan")
 
 fit <- model$sample(
   data = stan_data,
@@ -76,11 +61,11 @@ y_plot <- colMeans(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)])
 y_plot_lower <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.025)
 y_plot_upper <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.975)
 
-# Extract sigma for model diagnostics
+# Extract sigma and y_hat for diagnostics
 sigma <- mean(draws[, "sigma"])
+y_hat <- colMeans(draws[, grep("y_hat\\[", colnames(draws), value = TRUE)])
 
 # Create data frames for plotting
-# Smooth fit data
 fit_data <- data.frame(
   x = x_plot,
   y_hat = y_plot,
@@ -88,11 +73,11 @@ fit_data <- data.frame(
   y_hat_upper = y_plot_upper
 )
 
-# Original data with true function
 data_points <- data.frame(
   x = x,
   y = y,
-  y_true = y_true
+  y_true = y_true,
+  y_hat = y_hat
 )
 
 # High-resolution true function for smooth plotting
@@ -112,16 +97,15 @@ p <- ggplot() +
   scale_color_manual(values = c("Data" = "black", "B-spline fit" = "blue", "True function" = "red")) +
   scale_fill_manual(values = c("95% CI" = "blue")) +
   labs(
-    title = "B-spline Fit Demonstrating Key Features",
+    title = "B-spline Fit with 3 Knots (5 Basis Functions)",
     subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.2*x",
-    caption = paste0("Parameters: Adaptive knots = ", stan_data$num_knots, 
-                     ", Adaptive prior = ", round(stan_data$prior_scale, 1),
-                     ", smoothing_strength = ", stan_data$smoothing_strength,
-                     ", Estimated sigma = ", round(sigma, 3)),
+    caption = paste0("EDF = ", round(diagnosis$edf, 1), 
+                     ", Sigma = ", round(sigma, 3),
+                     ", Autocorrelation = ", round(diagnosis$residual_autocor, 3)),
     x = "x",
     y = "y"
   ) +
-  ylim(-1.6, 3.6) +  # Adjusted range for 0.2*x linear term
+  ylim(-1.6, 3.6) +
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "bottom",
@@ -132,7 +116,12 @@ p <- ggplot() +
 print(p)
 
 # Save the plot
-dir.create("output", showWarnings = FALSE)
-ggsave("output/bspline_minimal_example.png", p, width = 8, height = 6, dpi = 300)
+ggsave("claude-tmp/bspline_3_knots.png", p, width = 8, height = 6, dpi = 300)
 
-# The diagnostic function above already prints all necessary information
+# Print summary
+cat("\nModel Summary:\n")
+cat("==============\n")
+cat("Estimated noise (σ):", round(sigma, 3), "\n")
+cat("Number of knots specified:", 3, "\n")
+cat("Number of basis functions:", 5, "(knots + degree - 1)\n")
+cat("RMSE from true function:", round(sqrt(mean((data_points$y_hat - data_points$y_true)^2)), 3), "\n")

@@ -46,7 +46,9 @@ stan_data <- list(
   y = data$y,
   region = data$region,
   num_knots = 8,
-  spline_degree = 3
+  spline_degree = 3,
+  smoothing_strength = 1.0,  # Mild smoothing
+  prior_scale = 2 * sd(data$y)  # Data-driven prior
 )
 
 # Compile and fit model

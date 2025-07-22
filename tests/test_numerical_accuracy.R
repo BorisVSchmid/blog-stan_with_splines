@@ -34,7 +34,7 @@ test_bspline_partition_unity <- function() {
     y = y,
     num_knots = 6,  # Fewer knots for more stable fit
     spline_degree = 3,
-    tau_smooth = 0,  # No smoothing - use independent priors
+    smoothing_strength = 0,  # No smoothing - use independent priors
     prior_scale = 2  # Larger prior scale
   )
   
@@ -96,7 +96,7 @@ test_linear_interpolation <- function() {
     y = y,
     num_knots = 6,
     spline_degree = 3,
-    tau_smooth = 0,
+    smoothing_strength = 0,
     prior_scale = 10  # Increased to allow basis functions to contribute meaningfully
   )
   

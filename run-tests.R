@@ -10,7 +10,7 @@ start_time <- Sys.time()
 
 # List of test scripts to run
 test_scripts <- c(
-  "tests/quick_test.R",
+  "tests/test_basic_splines.R",
   "tests/test_numerical_accuracy.R", 
   "tests/test_analytical_solutions.R"
 )
@@ -79,7 +79,7 @@ if (!all_completed) {
 
 cat("\n=======================================================\n")
 cat("Test suite documentation:\n")
-cat("  quick_test.R             - Basic functionality checks\n")
+cat("  test_basic_splines.R     - Basic functionality checks\n")
 cat("  test_numerical_accuracy.R - Mathematical properties tests\n")
 cat("  test_analytical_solutions.R - Known function fitting tests\n")
 cat("  test_splines.R           - Comprehensive function type tests\n")

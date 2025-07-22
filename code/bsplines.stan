@@ -35,7 +35,7 @@ data {
   vector[n_data] y;
   int<lower=1> num_knots;
   int<lower=1> spline_degree;
-  real<lower=0> tau_smooth;  // Smoothing parameter (0.1=strong, 1.0=mild, 2.0+=minimal)
+  real<lower=0> smoothing_strength;  // Smoothing strength (0=none, 1=mild, 10=strong)
   real<lower=0> prior_scale;  // Scale for coefficient priors
 }
 
@@ -50,6 +50,16 @@ transformed data {
   vector[num_knots] knots;
   array[2*spline_degree + num_knots] real ext_knots_arr;
   matrix[num_basis, n_data] B;
+  
+  // Transform smoothing_strength to tau_smooth (random walk SD)
+  // smoothing_strength: 0=none, 1=mild, 10=strong
+  // tau_smooth: 0=special case for independent, small=smooth, large=flexible
+  real tau_smooth;
+  if (smoothing_strength == 0) {
+    tau_smooth = 0;  // Special case: triggers independent coefficients
+  } else {
+    tau_smooth = 1 / sqrt(smoothing_strength);  // Convert to SD scale
+  }
   
   {
     array[n_data] real x_sorted = sort_asc(x);
@@ -91,10 +101,16 @@ transformed parameters {
   vector[num_basis] alpha;  // Actual spline coefficients
   vector[n_data] y_hat;
   
-  // Apply random walk smoothing
-  alpha[1] = alpha_raw[1] * prior_scale;
-  for (i in 2:num_basis) {
-    alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth;
+  // Apply smoothing based on tau_smooth value
+  if (tau_smooth == 0) {
+    // No smoothing - independent coefficients scaled by prior_scale
+    alpha = alpha_raw * prior_scale;
+  } else {
+    // Random walk smoothing
+    alpha[1] = alpha_raw[1] * prior_scale;
+    for (i in 2:num_basis) {
+      alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth;
+    }
   }
   
   y_hat = alpha_0 + to_vector(alpha' * B);

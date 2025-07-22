@@ -9,11 +9,11 @@
 #
 # WRONG - Hard-coded multipliers:
 #   "Increase prior_scale (try multiplying by 2-5)"
-#   "Set tau_smooth to 0.1-0.3"
+#   "Set smoothing_strength to 10-100"
 #
 # RIGHT - Data-driven suggestions:
 #   "Increase prior_scale (autocorrelation 0.45 suggests multiplying by 2.4)"
-#   "Set tau_smooth > 0 (noise level suggests tau=0.23)"
+#   "Set smoothing_strength > 0 (noise level suggests strength=20)"
 #
 # The advice should be calculated from the actual diagnostic metrics,
 # not predetermined constants.
@@ -102,9 +102,9 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
     runs_proportion = runs_test,
     num_knots = stan_data$num_knots,
     num_basis = num_basis,
-    tau_smooth = ifelse("tau_smooth" %in% names(stan_data), stan_data$tau_smooth, NA),
+    smoothing_strength = ifelse("smoothing_strength" %in% names(stan_data), stan_data$smoothing_strength, NA),
     prior_scale = ifelse("prior_scale" %in% names(stan_data), stan_data$prior_scale, NA),
-    has_bspline_params = "tau_smooth" %in% names(stan_data) && "prior_scale" %in% names(stan_data)
+    has_bspline_params = "smoothing_strength" %in% names(stan_data) && "prior_scale" %in% names(stan_data)
   )
   
   # Determine if over-smoothed or overfitted
@@ -169,20 +169,20 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
     
     if (too_many_basis) {
       suggestions <- c(suggestions,
-        sprintf("  - Warning: %d basis functions for %d data points may cause instability", 
+        sprintf("  - Warning: %d basis functions for %d data points may need smoothing", 
                 diagnosis$num_basis, n),
-        sprintf("  - In R script: Reduce num_knots to %d-%d range", 
-                round(n/12), round(n/8))
+        sprintf("  - In R script: Increase smoothing_strength (current: %.1f)", 
+                ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0))
       )
     } else {
       suggestions <- c(suggestions,
-        sprintf("  - In R script: Try different num_knots (current: %d)", diagnosis$num_knots)
+        sprintf("  - In R script: Try increasing smoothing_strength", diagnosis$num_knots)
       )
     }
     
     if (model_type == "bspline" && diagnosis$has_bspline_params) {
       suggestions <- c(suggestions,
-        "  - In R script: Consider decreasing tau_smooth (e.g., to 0.5) for smoother transitions"
+        "  - The function may have features that splines struggle to capture"
       )
     } else if (model_type == "cspline") {
       suggestions <- c(suggestions,
@@ -227,10 +227,10 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
         }
       }
       
-      if (!is.na(diagnosis$tau_smooth) && diagnosis$tau_smooth > 0) {
+      if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength < 10) {
         suggestions <- c(suggestions,
-          sprintf("  - In R script: Reduce tau_smooth (current %.2f) or set to 0 for independent priors", 
-                  diagnosis$tau_smooth))
+          sprintf("  - In R script: Increase smoothing_strength (current %.1f) for more smoothing", 
+                  diagnosis$smoothing_strength))
       }
     } else {
       # C-spline or other spline types - only knot-based control
@@ -275,11 +275,11 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
           )
         }
         
-        if (is.na(diagnosis$tau_smooth) || diagnosis$tau_smooth == 0) {
+        if (is.na(diagnosis$smoothing_strength) || diagnosis$smoothing_strength < 1) {
           noise_ratio = residual_sd / sd(y)
-          suggested_tau = min(0.5, max(0.1, noise_ratio * 2))
+          suggested_strength = max(1, min(100, 10 / noise_ratio))
           suggestions <- c(suggestions,
-            sprintf("  2. In R script: Set tau_smooth = %.2f for smoother transitions", suggested_tau)
+            sprintf("  2. In R script: Set smoothing_strength = %.0f for smoother transitions", suggested_strength)
           )
         }
         
@@ -383,8 +383,8 @@ print_smoothing_diagnostics <- function(diagnosis) {
   } else {
     cat("\n")
   }
-  if (!is.na(diagnosis$tau_smooth)) {
-    cat(sprintf("Smoothing tau: %.1f\n", diagnosis$tau_smooth))
+  if (!is.na(diagnosis$smoothing_strength)) {
+    cat(sprintf("Smoothing strength: %.1f\n", diagnosis$smoothing_strength))
   }
   cat(sprintf("Estimated noise σ: %.3f\n", diagnosis$sigma_estimate))
   
@@ -435,8 +435,8 @@ print_smoothing_diagnostics <- function(diagnosis) {
     }
     # Add general advice about parameter adjustment
     cat("\nParameter adjustment guide:\n")
-    cat("- tau_smooth: Lower values = more smoothing (0.1 very smooth, 2.0+ minimal)\n")
-    cat("- num_knots: Fewer knots = smoother fit, more knots = flexible fit\n")
+    cat("- smoothing_strength: 0=none, 1=mild, 10=strong smoothing\n")
+    cat("- num_knots: Keep default (n/4, max 40) and adjust smoothing instead\n")
   } else {
     cat("No adjustments needed - model fit appears appropriate.\n")
   }
@@ -486,7 +486,7 @@ example_diagnostics <- function() {
     y = y,
     num_knots = 4,      # Few knots
     spline_degree = 3,
-    tau_smooth = 0,
+    smoothing_strength = 0,
     prior_scale = 0.5   # Restrictive prior
   )
   
