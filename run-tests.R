@@ -78,14 +78,25 @@ for (i in seq_along(all_tests)) {
   test_details[[test_name]] <- output
   
   # Quick status
-  status_symbol <- if (grepl("PASSED", result)) "✓" else "✗"
+  result_str <- paste(result, collapse = " ")
+  status_symbol <- if (grepl("PASSED", result_str)) "✓" else "✗"
   cat(sprintf("%s %s completed in %.1f seconds\n", status_symbol, test_name, test_time))
 }
 
 # Calculate summary statistics
 total_time <- as.numeric(Sys.time() - start_time, units = "secs")
-passed_tests <- sum(grepl("PASSED", unlist(test_results)))
-failed_tests <- sum(grepl("FAILED", unlist(test_results)))
+
+# Count tests properly - each test file is one test
+passed_tests <- 0
+failed_tests <- 0
+for (result in test_results) {
+  result_str <- paste(result, collapse = " ")
+  if (grepl("FAILED", result_str)) {
+    failed_tests <- failed_tests + 1
+  } else if (grepl("PASSED", result_str)) {
+    passed_tests <- passed_tests + 1
+  }
+}
 total_tests <- length(test_results)
 
 # Print detailed summary
@@ -109,9 +120,11 @@ for (test_name in names(test_results)) {
   time <- test_times[[test_name]]
   
   # Color coding for status (simplified for R output)
-  status_display <- if (grepl("PASSED", status)) {
+  # Handle case where status might be a vector
+  status_str <- paste(status, collapse = " ")
+  status_display <- if (grepl("PASSED", status_str)) {
     "PASSED"
-  } else if (grepl("WARNING", status)) {
+  } else if (grepl("WARNING", status_str)) {
     "PASSED+WARN"
   } else {
     "FAILED"
@@ -128,9 +141,10 @@ if (failed_tests > 0) {
   cat(rep("=", 60), "\n", sep = "")
   
   for (test_name in names(test_results)) {
-    if (grepl("FAILED", test_results[[test_name]])) {
+    result_str <- paste(test_results[[test_name]], collapse = " ")
+    if (grepl("FAILED", result_str)) {
       cat("\n", test_name, ":\n", sep = "")
-      cat(test_results[[test_name]], "\n")
+      cat(result_str, "\n")
       
       # Show last few lines of output
       output <- test_details[[test_name]]

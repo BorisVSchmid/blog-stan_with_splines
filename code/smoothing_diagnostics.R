@@ -360,23 +360,46 @@ print_smoothing_diagnostics <- function(diagnosis) {
   cat("\nSmoothing Diagnostics (Experimental):\n")
   cat("====================================\n")
   
+  # Add help option
+  if (!is.null(diagnosis$show_help) && diagnosis$show_help) {
+    cat("\nDiagnostic Metrics Explained:\n")
+    cat("- Effective degrees of freedom (EDF): Measures model complexity. Higher = more flexible\n")
+    cat("- Residual autocorrelation: Correlation between adjacent residuals. High values suggest over-smoothing\n")
+    cat("- Residual SD: Standard deviation of residuals. Should be close to true noise level\n")
+    cat("- LOO RMSE: Leave-one-out cross-validation error. Lower is better\n")
+    cat("- Smoothness (2nd diff SD): Variability in curvature. High values suggest wiggliness\n")
+    cat("- Runs test: Proportion of sign changes in residuals. ~0.5 is ideal (random pattern)\n\n")
+  }
+  
   # Calculate max EDF for context
   max_edf <- ifelse(!is.na(diagnosis$num_basis), diagnosis$num_basis + 1, diagnosis$num_knots + 1)
   edf_percent <- (diagnosis$edf / max_edf) * 100
   cat(sprintf("Effective degrees of freedom: %.1f of %d possible (%.0f%%)\n", 
               diagnosis$edf, max_edf, edf_percent))
+  cat("  → Measures model flexibility (higher = more wiggly)\n")
+  
   # Autocorrelation with interpretation
   autocor_level <- ifelse(diagnosis$residual_autocor > 0.3, " (high)", 
                           ifelse(diagnosis$residual_autocor > 0.2, " (moderate)", " (low)"))
   cat(sprintf("Residual autocorrelation: %.3f%s\n", diagnosis$residual_autocor, autocor_level))
+  cat("  → Pattern in residuals (high = over-smoothed)\n")
+  
   cat(sprintf("Residual SD: %.3f\n", diagnosis$residual_sd))
+  cat("  → Spread of residuals (compare to estimated σ)\n")
+  
   cat(sprintf("LOO RMSE: %.3f\n", diagnosis$loo_rmse))
+  cat("  → Cross-validation error (lower = better predictions)\n")
   
   if (!is.na(diagnosis$smoothness)) {
     cat(sprintf("Smoothness (2nd diff SD): %.3f\n", diagnosis$smoothness))
+    cat("  → Curvature variation (high = wiggly fit)\n")
   }
   
-  cat(sprintf("Runs test: %.3f\n", diagnosis$runs_proportion))
+  runs_interp <- ifelse(abs(diagnosis$runs_proportion - 0.5) < 0.1, " (good randomness)",
+                       ifelse(diagnosis$runs_proportion < 0.3, " (few sign changes)",
+                              ifelse(diagnosis$runs_proportion > 0.7, " (many sign changes)", "")))
+  cat(sprintf("Runs test: %.3f%s\n", diagnosis$runs_proportion, runs_interp))
+  cat("  → Randomness of residuals (0.5 = ideal)\n")
   
   # Assessment section
   cat("\nAssessment: ")
@@ -405,6 +428,11 @@ print_smoothing_diagnostics <- function(diagnosis) {
     cat("\nParameter adjustment guide:\n")
     cat("- smoothing_strength: 0=none, 1=mild, 10=strong smoothing\n")
     cat("- num_knots: Keep high enough to capture function complexity, adjust smoothing for regularization\n")
+    
+    cat("\nInterpreting the metrics:\n")
+    cat("- Good fit: EDF 40-80% of max, autocorr < 0.2, runs test ~0.5\n")
+    cat("- Overfitting: High EDF (>90%), high smoothness, low residual SD\n")
+    cat("- Over-smoothing: Low EDF (<30%), high autocorr (>0.3), runs test far from 0.5\n")
   } else {
     cat("No adjustments needed - model fit appears appropriate.\n")
   }

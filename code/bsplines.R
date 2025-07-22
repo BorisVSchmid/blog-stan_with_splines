@@ -39,9 +39,9 @@ stan_data <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 20,     # Use adaptive_knots if you need a default.
+  num_knots = 20,                 # Use adaptive_knots if you need a default.
   spline_degree = 3,              # Cubic splines (most common)
-  smoothing_strength = 5.0,  # Default moderate-strong smoothing
+  smoothing_strength = 7.5,       # Strong smoothing
   prior_scale = adaptive_prior    # Data-driven prior
 )
 
@@ -50,9 +50,10 @@ cat("Compiling B-spline model...\n")
 model <- cmdstan_model("code/bsplines.stan")
 
 cat("Fitting model with:\n")
-cat("  - Adaptive knots:", adaptive_knots, "(based on n =", n, ")\n")
+cat("  - Number of knots:", stan_data$num_knots, "\n")
 cat("  - Prior scale:", round(adaptive_prior, 2), "(based on data variance)\n")
-cat("  - Smoothing strength:", stan_data$smoothing_strength, "\n\n")
+cat("  - Smoothing strength:", stan_data$smoothing_strength, "\n")
+cat(sprintf("  - Note: Recommended knots based on sample size (n = %d) is %d\n\n", n, adaptive_knots))
 
 fit <- model$sample(
   data = stan_data,
@@ -114,8 +115,8 @@ p <- ggplot() +
   labs(
     title = "B-spline Fit Demonstrating Key Features",
     subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.25*x",
-    caption = paste0("Parameters: Adaptive knots = ", stan_data$num_knots, 
-                     ", Adaptive prior = ", round(stan_data$prior_scale, 1),
+    caption = paste0("Parameters: knots = ", stan_data$num_knots, 
+                     ", prior_scale = ", round(stan_data$prior_scale, 1),
                      ", smoothing_strength = ", stan_data$smoothing_strength,
                      ", Estimated sigma = ", round(sigma, 3)),
     x = "x",

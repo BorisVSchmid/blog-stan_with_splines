@@ -238,7 +238,9 @@ test_monotonicity <- function() {
     chains = 1,
     iter_warmup = 200,
     iter_sampling = 500,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.95,  # Increase to avoid divergences
+    max_treedepth = 12   # Increase to avoid hitting max treedepth
   )
   
   draws <- fit$draws(format = "matrix")
