@@ -79,4 +79,4 @@ print(p)
 
 # Save the plot
 dir.create("output", showWarnings = FALSE)
-ggsave("output/bspline_smooth_example.png", p, width = 8, height = 6, dpi = 300)
+ggsave("output/example-bspline_smooth_example.png", p, width = 8, height = 6, dpi = 300)

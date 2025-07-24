@@ -25,13 +25,13 @@ y <- y_true + rnorm(n, 0, 0.15)
 
 # Key features demonstration:
 # 1. Adaptive knot selection based on data size
-# Rule of thumb: n/4 for B-splines (with smoothing)
-adaptive_knots <- max(4, min(round(n/4), 40))
+# Rule of thumb: n/2 for B-splines (with smoothing)
+adaptive_knots <- max(4, min(round(n/2), 40))
 
 # 2. Adaptive prior scale based on data variance
 adaptive_prior <- 2 * sd(y)
 
-# 3. Default mild smoothing for more stable fits
+# 3. Default smoothing for more stable fits
 # smoothing_strength: 0=none, 1=mild, 10=strong
 
 # Prepare data for Stan
@@ -39,9 +39,9 @@ stan_data <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 20,                 # Use adaptive_knots if you need a default.
+  num_knots = adaptive_knots,     # Use adaptive knot selection (n/2)
   spline_degree = 3,              # Cubic splines (most common)
-  smoothing_strength = 7.5,       # Strong smoothing
+  smoothing_strength = 5.0,       # Moderate smoothing
   prior_scale = adaptive_prior    # Data-driven prior
 )
 
@@ -134,6 +134,6 @@ print(p)
 
 # Save the plot
 dir.create("output", showWarnings = FALSE)
-ggsave("output/bspline_minimal_example.png", p, width = 8, height = 6, dpi = 300)
+ggsave("output/code-bspline_minimal_example.png", p, width = 8, height = 6, dpi = 300)
 
 # The diagnostic function above already prints all necessary information

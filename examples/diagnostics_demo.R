@@ -14,6 +14,8 @@ library(patchwork)
 
 # Source diagnostic functions
 source("code/smoothing_diagnostics.R")
+# Source fit functions from test suite
+source("tests/test_splines.R", local = new.env(parent = globalenv()))
 
 set.seed(42)
 dir.create("output", showWarnings = FALSE)
@@ -127,7 +129,7 @@ combined_plot <- (plots[[1]] | plots[[2]] | plots[[3]]) /
     subtitle = "Blue: fitted spline with 95% CI, Red dashed: true function, Points: data"
   )
 
-ggsave("output/diagnostics_demo_comparison.png", combined_plot, 
+ggsave("output/example-diagnostics_demo_comparison.png", combined_plot, 
        width = 12, height = 8, dpi = 300)
 
 # Print summary of diagnostics
@@ -151,4 +153,4 @@ cat("   - Balanced EDF (not too high or low)\n")
 cat("   - Residuals appear random\n")
 cat("   - No diagnostic warnings\n\n")
 
-cat("Output saved: output/diagnostics_demo_comparison.png\n")
+cat("Output saved: output/example-diagnostics_demo_comparison.png\n")

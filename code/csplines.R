@@ -117,4 +117,4 @@ print(p)
 
 # Save the plot
 dir.create("output", showWarnings = FALSE)
-ggsave("output/cspline_minimal_example.png", p, width = 8, height = 6, dpi = 300)
+ggsave("output/code-cspline_minimal_example.png", p, width = 8, height = 6, dpi = 300)

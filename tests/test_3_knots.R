@@ -97,8 +97,9 @@ p <- ggplot() +
   scale_color_manual(values = c("Data" = "black", "B-spline fit" = "blue", "True function" = "red")) +
   scale_fill_manual(values = c("95% CI" = "blue")) +
   labs(
-    title = "B-spline Fit with 3 Knots (5 Basis Functions)",
-    subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.2*x",
+    title = paste0("B-spline Fit with ", stan_data$num_knots, " Knots (", 
+                   stan_data$num_knots + stan_data$spline_degree - 1, " Basis Functions)"),
+    subtitle = paste0("True function: sin(x) + 0.4*cos(3x) + 0.2*x | Smoothing strength = ", stan_data$smoothing_strength),
     caption = paste0("EDF = ", round(diagnosis$edf, 1), 
                      ", Sigma = ", round(sigma, 3),
                      ", Autocorrelation = ", round(diagnosis$residual_autocor, 3)),

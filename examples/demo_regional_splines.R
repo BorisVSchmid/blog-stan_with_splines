@@ -41,7 +41,7 @@ p_data <- ggplot(data, aes(x = x, y = y, color = region_name)) +
 
 # Save plot
 dir.create("output", showWarnings = FALSE)
-ggsave("output/regional_data.png", p_data, width = 8, height = 8, dpi = 300)
+ggsave("output/example-regional_data.png", p_data, width = 8, height = 8, dpi = 300)
 
 # Prepare Stan data
 stan_data <- list(
@@ -85,4 +85,4 @@ cat("\nTo fit the full model, run:\n")
 cat("model <- cmdstan_model('test_regional_splines.stan')\n")
 cat("fit <- model$sample(data = stan_data, chains = 4)\n")
 
-cat("\nPlot saved: output/regional_data.png\n")
+cat("\nPlot saved: output/example-regional_data.png\n")

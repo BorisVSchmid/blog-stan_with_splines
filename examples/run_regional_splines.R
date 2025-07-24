@@ -44,7 +44,9 @@ stan_data <- list(
   y = data$y,
   region = data$region,
   num_knots = 7,
-  spline_degree = 3
+  spline_degree = 3,
+  smoothing_strength = 5.0,  # Moderate smoothing
+  prior_scale = 2 * sd(data$y)  # Adaptive prior scale based on data variance
 )
 
 # Compile and fit model
@@ -85,7 +87,7 @@ p_data <- ggplot(data, aes(x = x, y = y, color = region_name)) +
   theme(legend.position = "none") +
   scale_color_brewer(palette = "Set2")
 
-ggsave("output/regional_splines_data.png", p_data, width = 8, height = 10, dpi = 300)
+ggsave("output/example-regional_splines_data.png", p_data, width = 8, height = 10, dpi = 300)
 
 # Plot 2: Extract fitted values with credible intervals
 y_hat_cols <- grep("y_hat\\[", colnames(draws), value = TRUE)
@@ -111,7 +113,7 @@ p_fitted <- ggplot(data, aes(x = x)) +
   scale_color_brewer(palette = "Set2") +
   scale_fill_brewer(palette = "Set2")
 
-ggsave("output/regional_splines_fitted.png", p_fitted, width = 8, height = 10, dpi = 300)
+ggsave("output/example-regional_splines_fitted.png", p_fitted, width = 8, height = 10, dpi = 300)
 
 # Plot 3: Global mean coefficients
 mu_alpha_cols <- grep("mu_alpha\\[", colnames(draws), value = TRUE)
@@ -134,7 +136,7 @@ p_global <- data.frame(
        x = "Basis Function", y = "Coefficient Value") +
   theme_bw()
 
-ggsave("output/regional_splines_global_coefficients.png", p_global, width = 8, height = 6, dpi = 300)
+ggsave("output/example-regional_splines_global_coefficients.png", p_global, width = 8, height = 6, dpi = 300)
 
 # Plot 4: Regional coefficients
 alpha_data <- list()
@@ -164,7 +166,7 @@ if (length(alpha_data) > 0) {
     theme_bw() +
     scale_color_brewer(palette = "Set2")
   
-  ggsave("output/regional_splines_coefficients_comparison.png", p_coeffs, width = 10, height = 6, dpi = 300)
+  ggsave("output/example-regional_splines_coefficients_comparison.png", p_coeffs, width = 10, height = 6, dpi = 300)
 }
 
 # Plot 5: Variance components
@@ -190,7 +192,7 @@ p_var <- ggplot(var_df, aes(x = component, y = variance, fill = component)) +
   theme(legend.position = "none") +
   scale_fill_brewer(palette = "Set3")
 
-ggsave("output/regional_splines_variance_components.png", p_var, width = 6, height = 5, dpi = 300)
+ggsave("output/example-regional_splines_variance_components.png", p_var, width = 6, height = 5, dpi = 300)
 
 # Print summary
 cat("\n======================================\n")
@@ -223,11 +225,11 @@ cat(sprintf("  Max R-hat: %.3f\n", max(fit$summary()$rhat, na.rm = TRUE)))
 cat(sprintf("  Min ESS Bulk: %.0f\n", min(fit$summary()$ess_bulk, na.rm = TRUE)))
 
 cat("\nOutputs saved:\n")
-cat("- output/regional_splines_data.png\n")
-cat("- output/regional_splines_fitted.png\n")
-cat("- output/regional_splines_global_coefficients.png\n")
-cat("- output/regional_splines_coefficients_comparison.png\n")
-cat("- output/regional_splines_variance_components.png\n")
+cat("- output/example-regional_splines_data.png\n")
+cat("- output/example-regional_splines_fitted.png\n")
+cat("- output/example-regional_splines_global_coefficients.png\n")
+cat("- output/example-regional_splines_coefficients_comparison.png\n")
+cat("- output/example-regional_splines_variance_components.png\n")
 
 cat("\nInterpretation:\n")
 cat("- The hierarchical model allows regions to have unique spline shapes\n")

@@ -42,7 +42,8 @@ for (i in seq_along(smoothing_values)) {
     y = y,
     num_knots = 12,  # Fixed number of knots
     spline_degree = 3,
-    smoothing_strength = strength
+    smoothing_strength = strength,
+    prior_scale = 2 * sd(y)  # Adaptive prior scale based on data variance
   )
   
   fit <- model$sample(
@@ -147,7 +148,7 @@ library(patchwork)
 combined_plot <- p_main / p_roughness + 
   plot_layout(heights = c(2, 1))
 
-ggsave("output/smoothing_strength_guide.png", combined_plot, 
+ggsave("output/example-smoothing_strength_guide.png", combined_plot, 
        width = 12, height = 12, dpi = 300)
 
 # Print recommendations
@@ -171,4 +172,4 @@ cat("- Number of knots (more knots need more smoothing)\n")
 cat("- Data noise level\n")
 cat("- Sample size\n")
 
-cat("\nOutput saved: output/smoothing_strength_guide.png\n")
+cat("\nOutput saved: output/example-smoothing_strength_guide.png\n")

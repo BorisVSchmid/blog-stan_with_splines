@@ -1,4 +1,9 @@
-// B-splines with random walk smoothing prior
+// B-splines with scale-invariant random walk smoothing prior
+// 
+// Key feature: The smoothing strength parameter works consistently across different data scales.
+// A smoothing_strength of 4.0 provides the same level of regularization whether your data
+// ranges from -1 to 1 or -1000 to 1000. This is achieved by scaling the random walk step
+// size by the data's standard deviation.
 functions {
   vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
     vector[size(t)] b_spline;
@@ -54,11 +59,19 @@ transformed data {
   // Transform smoothing_strength to tau_smooth (random walk SD)
   // smoothing_strength: 0=none, 1=mild, 10=strong
   // tau_smooth: 0=special case for independent, small=smooth, large=flexible
+  //
+  // CRITICAL: Scale-invariant smoothing implementation
+  // The random walk prior is: alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth
+  // To make smoothing strength consistent across different data scales, we scale
+  // tau_smooth by prior_scale (which is proportional to data SD).
+  // Without this scaling, the same smoothing_strength would underfit large-scale
+  // data (e.g., polynomials ranging 0-20) while overfitting small-scale data
+  // (e.g., sine functions ranging -1 to 1).
   real tau_smooth;
   if (smoothing_strength == 0) {
     tau_smooth = 0;  // Special case: triggers independent coefficients
   } else {
-    tau_smooth = 1 / sqrt(smoothing_strength);  // Convert to SD scale
+    tau_smooth = prior_scale / sqrt(smoothing_strength);  // Scale by data variance
   }
   
   {
@@ -106,8 +119,12 @@ transformed parameters {
     // No smoothing - independent coefficients scaled by prior_scale
     alpha = alpha_raw * prior_scale;
   } else {
-    // Random walk smoothing
+    // Random walk smoothing with scale-invariant steps
+    // First coefficient starts at the data scale
     alpha[1] = alpha_raw[1] * prior_scale;
+    // Subsequent coefficients follow a random walk with steps proportional to data scale
+    // This ensures consistent smoothing behavior regardless of whether y ranges from
+    // -1 to 1 or -1000 to 1000
     for (i in 2:num_basis) {
       alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth;
     }

@@ -253,8 +253,8 @@ plot_c <- ggplot() +
   coord_cartesian(xlim = c(-2, 12), ylim = c(-2, 2))
 
 # Save individual plots
-ggsave("output/bspline_boundary_knots.png", plot_b, width = 8, height = 6, dpi = 300)
-ggsave("output/cspline_extended_range.png", plot_c, width = 10, height = 6, dpi = 300)
+ggsave("output/example-bspline_boundary_knots.png", plot_b, width = 8, height = 6, dpi = 300)
+ggsave("output/example-cspline_extended_range.png", plot_c, width = 10, height = 6, dpi = 300)
 
 # Combined comparison
 combined <- plot_b / plot_c
@@ -264,9 +264,9 @@ combined_with_title <- combined +
     subtitle = "B-splines show polynomial continuation; C-splines become linear outside data range"
   )
 
-ggsave("output/spline_comparison_extended.png", combined_with_title, width = 10, height = 12, dpi = 300)
+# ggsave("output/example-spline_comparison_extended.png", combined_with_title, width = 10, height = 12, dpi = 300)
+# Removed as spline_comparison.png already shows these plots
 
 cat("\nPlots saved:\n")
-cat("- output/bspline_boundary_knots.png\n")
-cat("- output/cspline_extended_range.png\n")
-cat("- output/spline_comparison_extended.png\n")
+cat("- output/example-bspline_boundary_knots.png\n")
+cat("- output/example-cspline_extended_range.png\n")

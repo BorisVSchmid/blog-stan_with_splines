@@ -44,8 +44,15 @@ generate_test_data <- function(n = 50, func_type = "sine", noise_sd = 0.1) {
 }
 
 # Function to fit B-spline model
-fit_bspline <- function(data, num_knots = 5, spline_degree = 3, 
+fit_bspline <- function(data, num_knots = NULL, spline_degree = 3, 
+                        smoothing_strength = 5.0,
                         chains = 2, iter_warmup = 500, iter_sampling = 1000) {
+  
+  # Adaptive knot selection if not specified
+  if (is.null(num_knots)) {
+    n <- length(data$x)
+    num_knots <- max(4, min(round(n/2), 40))
+  }
   
   stan_data <- list(
     n_data = length(data$x),
@@ -53,7 +60,7 @@ fit_bspline <- function(data, num_knots = 5, spline_degree = 3,
     y = data$y,
     num_knots = num_knots,
     spline_degree = spline_degree,
-    smoothing_strength = 1.0,  # Default mild smoothing
+    smoothing_strength = smoothing_strength,  # Allow custom smoothing
     prior_scale = 2 * sd(data$y)  # Adaptive prior
   )
   
@@ -70,12 +77,21 @@ fit_bspline <- function(data, num_knots = 5, spline_degree = 3,
     refresh = 0
   )
   
+  # Store stan_data as an attribute
+  attr(fit, "stan_data") <- stan_data
+  
   return(fit)
 }
 
 # Function to fit C-spline model
-fit_cspline <- function(data, num_knots = 5, 
+fit_cspline <- function(data, num_knots = NULL, 
                         chains = 2, iter_warmup = 500, iter_sampling = 1000) {
+  
+  # Adaptive knot selection if not specified
+  if (is.null(num_knots)) {
+    n <- length(data$x)
+    num_knots <- max(4, min(round(n/4), 40))
+  }
   
   stan_data <- list(
     n_data = length(data$x),
@@ -97,11 +113,14 @@ fit_cspline <- function(data, num_knots = 5,
     refresh = 0
   )
   
+  # Store stan_data as an attribute
+  attr(fit, "stan_data") <- stan_data
+  
   return(fit)
 }
 
 # Function to extract and plot results
-plot_spline_fit <- function(fit, data, spline_type, show_basis = FALSE) {
+plot_spline_fit <- function(fit, data, spline_type, show_basis = FALSE, params = NULL) {
   draws <- fit$draws(format = "matrix")
   
   # Extract fitted values at plot points
@@ -124,13 +143,17 @@ plot_spline_fit <- function(fit, data, spline_type, show_basis = FALSE) {
     p <- ggplot() +
       geom_ribbon(data = plot_df, aes(x = x, ymin = y_lower, ymax = y_upper), 
                   alpha = 0.2, fill = "blue") +
-      geom_line(data = plot_df, aes(x = x, y = y_mean), color = "blue", size = 1) +
+      geom_line(data = plot_df, aes(x = x, y = y_mean), color = "blue", linewidth = 1) +
       geom_point(data = data.frame(x = data$x, y = data$y), 
                  aes(x = x, y = y), alpha = 0.6) +
       geom_line(data = data.frame(x = data$x, y = data$y_true), 
                 aes(x = x, y = y), color = "red", linetype = "dashed", alpha = 0.5) +
       labs(title = paste(spline_type, "fit"),
-           subtitle = data$func_type,
+           subtitle = if (!is.null(params)) {
+             paste0(data$func_type, " | ", params)
+           } else {
+             data$func_type
+           },
            x = "x", y = "y") +
       theme_bw() +
       theme(plot.title = element_text(size = 10),
@@ -224,42 +247,66 @@ cat("Test 1: Sine function\n")
 data_sine <- generate_test_data(n = 30, func_type = "sine", noise_sd = 0.1)
 
 cat("  [Test 1 - B-spline sine function] Fitting model...\n")
-fit_b_sine <- fit_bspline(data_sine, num_knots = 7, spline_degree = 3)
+fit_b_sine <- fit_bspline(data_sine)  # Will use n/2 = 15 knots
 diag_b_sine <- check_diagnostics(fit_b_sine, "B-spline (sine)")
-plots_b_sine <- plot_spline_fit(fit_b_sine, data_sine, "B-spline", show_basis = TRUE)
+# Extract actual parameters from the fit
+b_sine_knots <- attr(fit_b_sine, "stan_data")$num_knots
+b_sine_degree <- attr(fit_b_sine, "stan_data")$spline_degree
+b_sine_smooth <- attr(fit_b_sine, "stan_data")$smoothing_strength
+plots_b_sine <- plot_spline_fit(fit_b_sine, data_sine, "B-spline", show_basis = TRUE, 
+                                params = paste0("knots=", b_sine_knots, ", degree=", b_sine_degree, ", smoothing=", b_sine_smooth))
 
 cat("\n  [Test 1 - C-spline sine function] Fitting model...\n")
-fit_c_sine <- fit_cspline(data_sine, num_knots = 7)
+fit_c_sine <- fit_cspline(data_sine)  # Will use n/4 = 7.5 ≈ 8 knots
 diag_c_sine <- check_diagnostics(fit_c_sine, "C-spline (sine)")
-plots_c_sine <- plot_spline_fit(fit_c_sine, data_sine, "C-spline")
+# Extract actual parameters from the fit
+c_sine_knots <- attr(fit_c_sine, "stan_data")$num_knots
+plots_c_sine <- plot_spline_fit(fit_c_sine, data_sine, "C-spline",
+                                params = paste0("knots=", c_sine_knots))
 
 # Test 2: Polynomial function
 cat("\n\nTest 2: Polynomial function\n")
-data_poly <- generate_test_data(n = 40, func_type = "polynomial", noise_sd = 0.5)
+data_poly <- generate_test_data(n = 40, func_type = "polynomial", noise_sd = 0.2)
 
 cat("  [Test 2 - B-spline polynomial function] Fitting model...\n")
-fit_b_poly <- fit_bspline(data_poly, num_knots = 5, spline_degree = 3)
+fit_b_poly <- fit_bspline(data_poly)  # Will use n/2 = 20 knots
 diag_b_poly <- check_diagnostics(fit_b_poly, "B-spline (polynomial)")
-plots_b_poly <- plot_spline_fit(fit_b_poly, data_poly, "B-spline")
+# Extract actual parameters from the fit
+b_poly_knots <- attr(fit_b_poly, "stan_data")$num_knots
+b_poly_degree <- attr(fit_b_poly, "stan_data")$spline_degree
+b_poly_smooth <- attr(fit_b_poly, "stan_data")$smoothing_strength
+plots_b_poly <- plot_spline_fit(fit_b_poly, data_poly, "B-spline",
+                                params = paste0("knots=", b_poly_knots, ", degree=", b_poly_degree, ", smoothing=", b_poly_smooth))
 
 cat("\n  [Test 2 - C-spline polynomial function] Fitting model...\n")
-fit_c_poly <- fit_cspline(data_poly, num_knots = 5)
+fit_c_poly <- fit_cspline(data_poly)  # Will use n/4 = 10 knots
 diag_c_poly <- check_diagnostics(fit_c_poly, "C-spline (polynomial)")
-plots_c_poly <- plot_spline_fit(fit_c_poly, data_poly, "C-spline")
+# Extract actual parameters from the fit
+c_poly_knots <- attr(fit_c_poly, "stan_data")$num_knots
+plots_c_poly <- plot_spline_fit(fit_c_poly, data_poly, "C-spline",
+                                params = paste0("knots=", c_poly_knots))
 
 # Test 3: Complex function
 cat("\n\nTest 3: Complex function (sin + cos)\n")
 data_complex <- generate_test_data(n = 50, func_type = "complex", noise_sd = 0.1)
 
 cat("  [Test 3 - B-spline complex function] Fitting model...\n")
-fit_b_complex <- fit_bspline(data_complex, num_knots = 10, spline_degree = 3)
+fit_b_complex <- fit_bspline(data_complex)  # Will use n/2 = 25 knots
 diag_b_complex <- check_diagnostics(fit_b_complex, "B-spline (complex)")
-plots_b_complex <- plot_spline_fit(fit_b_complex, data_complex, "B-spline")
+# Extract actual parameters from the fit
+b_complex_knots <- attr(fit_b_complex, "stan_data")$num_knots
+b_complex_degree <- attr(fit_b_complex, "stan_data")$spline_degree
+b_complex_smooth <- attr(fit_b_complex, "stan_data")$smoothing_strength
+plots_b_complex <- plot_spline_fit(fit_b_complex, data_complex, "B-spline",
+                                   params = paste0("knots=", b_complex_knots, ", degree=", b_complex_degree, ", smoothing=", b_complex_smooth))
 
 cat("\n  [Test 3 - C-spline complex function] Fitting model...\n")
-fit_c_complex <- fit_cspline(data_complex, num_knots = 10)
+fit_c_complex <- fit_cspline(data_complex)  # Will use n/4 = 12.5 ≈ 12 knots
 diag_c_complex <- check_diagnostics(fit_c_complex, "C-spline (complex)")
-plots_c_complex <- plot_spline_fit(fit_c_complex, data_complex, "C-spline")
+# Extract actual parameters from the fit
+c_complex_knots <- attr(fit_c_complex, "stan_data")$num_knots
+plots_c_complex <- plot_spline_fit(fit_c_complex, data_complex, "C-spline",
+                                   params = paste0("knots=", c_complex_knots))
 
 # Create combined plots using patchwork
 if (!is.null(plots_b_sine$fit) && !is.null(plots_c_sine$fit)) {
@@ -269,18 +316,20 @@ if (!is.null(plots_b_sine$fit) && !is.null(plots_c_sine$fit)) {
                (plots_b_complex$fit | plots_c_complex$fit) +
     plot_annotation(
       title = "B-splines vs C-splines: Function Fitting Comparison",
-      subtitle = "Blue: fitted spline with 95% CI, Red dashed: true function, Points: data"
+      subtitle = paste0("Blue: fitted spline with 95% CI, Red dashed: true function, Points: data\n",
+                       "B-splines: n/2 knots with smoothing = ", b_sine_smooth, 
+                       " | C-splines: n/4 knots (no smoothing)")
     )
   
-  ggsave("output/spline_comparison.png", main_plot, width = 10, height = 12, dpi = 300)
-  cat("\n\nMain comparison plot saved to output/spline_comparison.png\n")
+  ggsave("output/test-spline_comparison.png", main_plot, width = 10, height = 12, dpi = 300)
+  cat("\n\nMain comparison plot saved to output/test-spline_comparison.png\n")
   
   # Basis functions plot
   if (!is.null(plots_b_sine$basis)) {
     basis_plot <- plots_b_sine$basis +
       plot_annotation(title = "B-spline Basis Functions (Sine Example)")
-    ggsave("output/bspline_basis_functions.png", basis_plot, width = 8, height = 6, dpi = 300)
-    cat("Basis functions plot saved to output/bspline_basis_functions.png\n")
+    ggsave("output/test-bspline_basis_functions.png", basis_plot, width = 8, height = 6, dpi = 300)
+    cat("Basis functions plot saved to output/test-bspline_basis_functions.png\n")
   }
 }
 
@@ -333,28 +382,68 @@ for (degree in c(2, 3, 4)) {
 if (length(degree_plots) > 0) {
   degree_comparison <- wrap_plots(degree_plots, ncol = 3) +
     plot_annotation(title = "B-spline Degree Comparison")
-  ggsave("output/bspline_degree_comparison.png", degree_comparison, width = 12, height = 5, dpi = 300)
-  cat("\nDegree comparison plot saved to output/bspline_degree_comparison.png\n")
+  ggsave("output/test-bspline_degree_comparison.png", degree_comparison, width = 12, height = 5, dpi = 300)
+  cat("\nDegree comparison plot saved to output/test-bspline_degree_comparison.png\n")
 }
 
-# Save diagnostics summary
-diagnostics_summary <- list(
-  sine = list(
-    bspline = diag_b_sine,
-    cspline = diag_c_sine
+# Save diagnostics summary as CSV
+# Helper function to safely extract diagnostic values
+get_diag_value <- function(diag_obj, field) {
+  if (!is.null(diag_obj) && !is.null(diag_obj[[field]])) {
+    return(diag_obj[[field]])
+  } else {
+    return(NA)
+  }
+}
+
+diagnostics_df <- data.frame(
+  function_type = c("sine", "sine", "polynomial", "polynomial", "complex", "complex"),
+  spline_type = rep(c("bspline", "cspline"), 3),
+  ess_bulk = c(
+    get_diag_value(diag_b_sine, "ess_bulk"),
+    get_diag_value(diag_c_sine, "ess_bulk"),
+    get_diag_value(diag_b_poly, "ess_bulk"),
+    get_diag_value(diag_c_poly, "ess_bulk"),
+    get_diag_value(diag_b_complex, "ess_bulk"),
+    get_diag_value(diag_c_complex, "ess_bulk")
   ),
-  polynomial = list(
-    bspline = diag_b_poly,
-    cspline = diag_c_poly
+  ess_tail = c(
+    get_diag_value(diag_b_sine, "ess_tail"),
+    get_diag_value(diag_c_sine, "ess_tail"),
+    get_diag_value(diag_b_poly, "ess_tail"),
+    get_diag_value(diag_c_poly, "ess_tail"),
+    get_diag_value(diag_b_complex, "ess_tail"),
+    get_diag_value(diag_c_complex, "ess_tail")
   ),
-  complex = list(
-    bspline = diag_b_complex,
-    cspline = diag_c_complex
+  rhat = c(
+    get_diag_value(diag_b_sine, "rhat"),
+    get_diag_value(diag_c_sine, "rhat"),
+    get_diag_value(diag_b_poly, "rhat"),
+    get_diag_value(diag_c_poly, "rhat"),
+    get_diag_value(diag_b_complex, "rhat"),
+    get_diag_value(diag_c_complex, "rhat")
   ),
-  timestamp = Sys.time()
+  divergences = c(
+    get_diag_value(diag_b_sine, "divergences"),
+    get_diag_value(diag_c_sine, "divergences"),
+    get_diag_value(diag_b_poly, "divergences"),
+    get_diag_value(diag_c_poly, "divergences"),
+    get_diag_value(diag_b_complex, "divergences"),
+    get_diag_value(diag_c_complex, "divergences")
+  ),
+  diagnostics_passed = c(
+    get_diag_value(diag_b_sine, "all_ok"),
+    get_diag_value(diag_c_sine, "all_ok"),
+    get_diag_value(diag_b_poly, "all_ok"),
+    get_diag_value(diag_c_poly, "all_ok"),
+    get_diag_value(diag_b_complex, "all_ok"),
+    get_diag_value(diag_c_complex, "all_ok")
+  ),
+  timestamp = rep(as.character(Sys.time()), 6),
+  stringsAsFactors = FALSE
 )
 
-saveRDS(diagnostics_summary, "output/diagnostics_summary.rds")
+write.csv(diagnostics_df, "output/test-diagnostics_summary.csv", row.names = FALSE)
 
 # Performance comparison
 cat("\n\n=== Performance comparison ===\n")
@@ -387,12 +476,12 @@ timing_results <- data.frame(
   total_iterations = 1500
 )
 
-write.csv(timing_results, "output/timing_results.csv", row.names = FALSE)
+write.csv(timing_results, "output/test-timing_results.csv", row.names = FALSE)
 
 cat("\n\n=== Testing complete ===\n")
 cat("Results saved to output/ directory:\n")
-cat("  - spline_comparison.png: Main comparison plots\n")
-cat("  - bspline_basis_functions.png: B-spline basis visualization\n")
-cat("  - bspline_degree_comparison.png: Effect of spline degree\n")
-cat("  - diagnostics_summary.rds: Full diagnostics results\n")
-cat("  - timing_results.csv: Performance comparison\n")
+cat("  - test-spline_comparison.png: Main comparison plots\n")
+cat("  - test-bspline_basis_functions.png: B-spline basis visualization\n")
+cat("  - test-bspline_degree_comparison.png: Effect of spline degree\n")
+cat("  - test-diagnostics_summary.csv: Full diagnostics results\n")
+cat("  - test-timing_results.csv: Performance comparison\n")

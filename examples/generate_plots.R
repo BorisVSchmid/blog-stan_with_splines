@@ -114,7 +114,7 @@ if (length(basis_cols) > 0) {
     theme_minimal() +
     theme(legend.position = "right")
   
-  ggsave("output/bspline_basis_functions.png", plot_basis, width = 8, height = 6, dpi = 300)
+  ggsave("output/example-bspline_basis_functions.png", plot_basis, width = 8, height = 6, dpi = 300)
   cat("Saved basis functions plot\n")
 }
 
@@ -126,7 +126,7 @@ combined_with_title <- combined +
     subtitle = "Blue: fitted spline with 95% CI, Red dashed: true function, Points: noisy data"
   )
 
-ggsave("output/spline_comparison.png", combined_with_title, width = 12, height = 6, dpi = 300)
+ggsave("output/example-spline_comparison.png", combined_with_title, width = 12, height = 6, dpi = 300)
 cat("Saved comparison plot\n")
 
 cat("\nPlots saved to output/ directory\n")

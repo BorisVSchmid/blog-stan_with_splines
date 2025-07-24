@@ -33,7 +33,8 @@ stan_data_standard <- list(
   y = y,
   num_knots = 15,  # Many knots to show overfitting
   spline_degree = 3,
-  smoothing_strength = 0  # No smoothing for standard fit
+  smoothing_strength = 0,  # No smoothing for standard fit
+  prior_scale = 2.0  # Prior scale for coefficients
 )
 
 fit_standard <- model$sample(
@@ -159,10 +160,10 @@ combined_plot <- p_smoothing / p_summary +
   plot_layout(heights = c(2, 1))
 
 # Save plots
-ggsave("output/bspline_smoothing_comparison.png", combined_plot, 
+ggsave("output/example-bspline_smoothing_comparison.png", combined_plot, 
        width = 10, height = 12, dpi = 300)
 
-cat("\nPlot saved: output/bspline_smoothing_comparison.png\n")
+cat("\nPlot saved: output/example-bspline_smoothing_comparison.png\n")
 
 # Print diagnostics
 cat("\nModel comparison:\n")

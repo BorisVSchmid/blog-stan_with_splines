@@ -190,24 +190,24 @@ combined_plot <- (p1 | (p2 / p3)) +
   plot_layout(widths = c(2, 1))
 
 # Save combined visualization
-ggsave("output/regional_splines_comprehensive.png", combined_plot, 
+ggsave("output/test-regional_splines_comprehensive.png", combined_plot, 
        width = 14, height = 10, dpi = 300)
 
 # Also save individual plots for detailed examination
-ggsave("output/regional_splines_fits.png", p1, 
+ggsave("output/test-regional_splines_fits.png", p1, 
        width = 8, height = 10, dpi = 300)
 
-ggsave("output/regional_splines_coefficients.png", p2, 
+ggsave("output/test-regional_splines_coefficients.png", p2, 
        width = 6, height = 5, dpi = 300)
 
-ggsave("output/regional_splines_variance.png", p3, 
+ggsave("output/test-regional_splines_variance.png", p3, 
        width = 6, height = 5, dpi = 300)
 
 cat("\nOutputs saved:\n")
-cat("- output/regional_splines_comprehensive.png (combined visualization)\n")
-cat("- output/regional_splines_fits.png (individual region fits)\n")
-cat("- output/regional_splines_coefficients.png (global coefficients)\n")
-cat("- output/regional_splines_variance.png (variance decomposition)\n")
+cat("- output/test-regional_splines_comprehensive.png (combined visualization)\n")
+cat("- output/test-regional_splines_fits.png (individual region fits)\n")
+cat("- output/test-regional_splines_coefficients.png (global coefficients)\n")
+cat("- output/test-regional_splines_variance.png (variance decomposition)\n")
 
 # Print regional effects
 beta_region <- colMeans(draws[, grep("beta_region\\[", colnames(draws), value = TRUE)])

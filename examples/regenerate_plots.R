@@ -39,9 +39,9 @@ p_data <- ggplot(data, aes(x = x, y = y, color = region_name)) +
 
 # Save plot
 dir.create("output", showWarnings = FALSE)
-ggsave("output/regional_data.png", p_data, width = 8, height = 8, dpi = 300)
+ggsave("output/example-regional_data.png", p_data, width = 8, height = 8, dpi = 300)
 
-cat("Regenerated regional_data.png with white background\n")
+cat("Regenerated example-regional_data.png with white background\n")
 
 # If you want to regenerate other specific plots, run:
 # source("run_regional_splines_fixed.R")  # This will refit models and regenerate all regional plots
