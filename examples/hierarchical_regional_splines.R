@@ -101,12 +101,20 @@ stan_data <- list(
 )
 
 # Check if fitted model exists
-model_cache_file <- "output/example-hierarchical_model_fit.rds"
+model_cache_file <- "output/example-hierarchical_model_draws.rds"
 
 if (file.exists(model_cache_file)) {
-  cat("Loading cached model fit...\n")
-  fit <- readRDS(model_cache_file)
-  draws <- fit$draws(format = "matrix")
+  cat("Loading cached model draws...\n")
+  cache_data <- readRDS(model_cache_file)
+  draws <- cache_data$draws
+  diagnostics <- cache_data$diagnostics
+  summary_stats <- cache_data$summary
+  
+  # Print cached diagnostics
+  cat("\nCached MCMC Diagnostic Summary:\n")
+  cat(sprintf("  Divergences: %d\n", diagnostics$num_divergent))
+  cat(sprintf("  Max treedepth hits: %d\n", diagnostics$num_max_treedepth))
+  cat(sprintf("  Min EBFMI: %.3f\n", diagnostics$min_ebfmi))
 } else {
   # Compile and fit model
   cat("Fitting hierarchical model (this may take a few minutes)...\n")
@@ -126,14 +134,27 @@ if (file.exists(model_cache_file)) {
   
   # Print diagnostic summary
   cat("\nMCMC Diagnostic Summary:\n")
-  print(fit$diagnostic_summary())
+  diag_summary <- fit$diagnostic_summary()
+  print(diag_summary)
   
-  # Save fitted model
-  cat("Saving fitted model for future runs...\n")
-  saveRDS(fit, model_cache_file)
-  
-  # Extract draws
+  # Extract draws before fit object is destroyed
   draws <- fit$draws(format = "matrix")
+  
+  # Save draws and diagnostics for future runs
+  cat("Saving model draws for future runs...\n")
+  cache_data <- list(
+    draws = draws,
+    diagnostics = list(
+      num_divergent = sum(diag_summary$num_divergent),
+      num_max_treedepth = sum(diag_summary$num_max_treedepth),
+      min_ebfmi = min(diag_summary$ebfmi)
+    ),
+    summary = list(
+      max_rhat = max(fit$summary()$rhat, na.rm = TRUE),
+      min_ess_bulk = min(fit$summary()$ess_bulk, na.rm = TRUE)
+    )
+  )
+  saveRDS(cache_data, model_cache_file)
 }
 
 # Create output directory
@@ -195,14 +216,14 @@ ext_knots <- c(rep(knots[1], stan_data$spline_degree),
                rep(knots[length(knots)], stan_data$spline_degree))
 
 # Build basis matrix
-B_plot <- matrix(0, num_basis, length(x_plot))
+B_plot <- matrix(0, length(x_plot), num_basis)
 for (i in 1:num_basis) {
-  B_plot[i, ] <- build_b_spline(x_plot, ext_knots, i, stan_data$spline_degree + 1, stan_data$spline_degree)
+  B_plot[, i] <- build_b_spline(x_plot, ext_knots, i, stan_data$spline_degree + 1, stan_data$spline_degree)
 }
 
 # Compute recovered global pattern
-# mu_alpha is a row vector, so we need to ensure proper dimensions
-recovered_global <- as.numeric(matrix(mu_alpha_mean, nrow = 1) %*% B_plot) + mu_beta
+# B_plot is n_plot × num_basis, mu_alpha_mean is num_basis × 1
+recovered_global <- as.numeric(B_plot %*% mu_alpha_mean) + mu_beta
 
 # Extract regional deviations
 # For each region: (alpha[r] - mu_alpha) * B + (beta[r] - mu_beta)
@@ -212,7 +233,7 @@ for (r in 1:3) {
   alpha_r_mean <- colMeans(draws[, alpha_cols])
   beta_r <- mean(draws[, paste0("beta_region[", r, "]")])
   
-  deviation <- as.numeric(matrix(alpha_r_mean - mu_alpha_mean, nrow = 1) %*% B_plot) + (beta_r - mu_beta)
+  deviation <- as.numeric(B_plot %*% (alpha_r_mean - mu_alpha_mean)) + (beta_r - mu_beta)
   regional_deviations[[r]] <- deviation
 }
 
@@ -327,8 +348,16 @@ for (r in 1:3) {
 
 # Model diagnostics
 cat("\nModel diagnostics:\n")
-cat(sprintf("  Divergences: %d\n", sum(fit$sampler_diagnostics()[,,"divergent__"])))
-cat(sprintf("  Max R-hat: %.3f\n", max(fit$summary()$rhat, na.rm = TRUE)))
-cat(sprintf("  Min ESS Bulk: %.0f\n", min(fit$summary()$ess_bulk, na.rm = TRUE)))
+if (exists("diagnostics")) {
+  # Use cached diagnostics
+  cat(sprintf("  Divergences: %d\n", diagnostics$num_divergent))
+  cat(sprintf("  Max R-hat: %.3f\n", ifelse(exists("summary_stats"), summary_stats$max_rhat, NA)))
+  cat(sprintf("  Min ESS Bulk: %.0f\n", ifelse(exists("summary_stats"), summary_stats$min_ess_bulk, NA)))
+} else {
+  # Calculate from fit object if available
+  cat(sprintf("  Divergences: %d\n", sum(fit$sampler_diagnostics()[,,"divergent__"])))
+  cat(sprintf("  Max R-hat: %.3f\n", max(fit$summary()$rhat, na.rm = TRUE)))
+  cat(sprintf("  Min ESS Bulk: %.0f\n", min(fit$summary()$ess_bulk, na.rm = TRUE)))
+}
 
 cat("\nOutput saved: output/example-hierarchical_decomposition.png\n")

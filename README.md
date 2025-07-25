@@ -7,26 +7,30 @@ This repository contains minimal implementations for testing B-splines and natur
 ## Overview
 
 Two spline implementations are provided:
-- **B-splines** (`test_bsplines.stan`): Based on Stan documentation and case studies
-- **C-splines** (`test_csplines.stan`): Natural cubic splines using the stan-splines library
+- **B-splines** (`code/bsplines.stan`): Based on Stan documentation with scale-invariant smoothing
+- **C-splines** (`code/csplines.stan`): Natural cubic splines using the stan-splines library
 
 ## Files
 
 ### Core Implementations
-- `test_bsplines.stan` - B-spline implementation
-- `test_csplines.stan` - Natural cubic spline implementation  
-- `spline.stan` - Natural cubic spline functions from stan-splines library
+- `code/bsplines.stan` - B-spline implementation with scale-invariant smoothing
+- `code/csplines.stan` - Natural cubic spline implementation  
+- `code/spline.stan` - Natural cubic spline functions from stan-splines library (dependency)
+- `code/smoothing_diagnostics.R` - Diagnostic tools for detecting over/under-smoothing
 
-### Testing Scripts
-- `test_splines.R` - Comprehensive testing script
-- `quick_test.R` - Simple test for quick verification
-- `generate_plots_extended.R` - Extended boundary behavior visualization
+### Testing Suite (8 tests)
+- `tests/test_basic_splines.R` - Basic functionality of both spline types
+- `tests/test_edge_cases_minimal_knots.R` - Edge cases with 2-3 knots
+- `tests/test_flexibility_bspline_vs_cspline.R` - Smoothing comparison
+- `tests/test_numerical_accuracy.R` - Mathematical properties verification
+- `tests/test_analytical_solutions.R` - Known function fitting
+- `tests/test_diagnostic_recommendations.R` - Diagnostic system testing
+- `tests/test_various_target_functions.R` - Six different target functions
+- `tests/test_regional_splines.R` - Hierarchical regional models
 
-### Regional/Hierarchical Models
-- `test_regional_splines.stan` - Full hierarchical model with smoothness penalties
-- `test_regional_splines_v2.stan` - Simplified hierarchical model
-- `run_regional_splines.R` - Complete regional analysis with visualizations
-- `demo_regional_splines.R` - Simple demonstration of regional concepts
+### Example Scripts
+- `examples/hierarchical_regional_splines.R` - Advanced hierarchical decomposition
+- `examples/regional_splines.stan` - Stan model for regional hierarchical splines
 
 ### Output
 - `output/` - Directory for all generated plots and results
@@ -197,21 +201,44 @@ In complex models, you might use both:
 - C-splines for smooth confounders or baseline trends
 - Example: COVID-19 model with B-splines for daily cases and C-splines for age effects
 
-## Shrinkage and Regularization
+## Smoothing and Regularization
 
-Neither implementation includes automatic shrinkage or regularization:
+### B-splines: Scale-Invariant Smoothing
 
-- **No built-in penalties** on roughness or complexity
-- **No adaptive smoothing** parameters
-- Smoothness controlled only by:
-  - Number of knots (fewer = smoother)
-  - Degree (for B-splines)
-  - Prior distributions on coefficients
+B-splines now include a sophisticated scale-invariant smoothing system:
 
-To add shrinkage, you could:
-1. Add a smoothing penalty in the model block
-2. Use hierarchical priors on spline coefficients
-3. Implement penalized splines (P-splines)
+```r
+# The smoothing parameter adapts to your data automatically
+tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis)
+```
+
+**Key features:**
+- **Scale-invariant**: Adapts to the standard deviation of your y-values
+- **Basis-aware**: Accounts for the number of basis functions
+- **Intuitive control**: 
+  - `smoothing_strength = 0`: No smoothing (independent coefficients)
+  - `smoothing_strength = 1-2`: Mild smoothing (recommended default)
+  - `smoothing_strength = 5-10`: Strong smoothing
+
+The implementation uses a random walk prior on coefficients:
+```stan
+alpha[i] ~ normal(alpha[i-1], tau_smooth)
+```
+
+### C-splines: Knot-Based Smoothing
+
+C-splines control smoothness through the number of knots:
+- Fewer knots = smoother curves
+- More knots = more flexible fitting
+- Natural boundary conditions ensure smooth behavior
+
+### Diagnostic System
+
+The package includes `code/smoothing_diagnostics.R` which provides:
+- Automatic detection of over/under-smoothing
+- Context-aware recommendations
+- Key metrics: residual autocorrelation, runs test, EDF approximation
+- Actionable parameter adjustments based on diagnostics
 
 ## Knot Placement
 
@@ -268,12 +295,24 @@ From testing on a 100-point dataset with 8 knots:
 
 ## Example Results
 
-See `output/` directory for:
-- `spline_comparison.pdf` - Side-by-side comparisons
-- `bspline_basis_functions.pdf` - Visualization of basis functions
-- `bspline_degree_comparison.pdf` - Effect of spline degree
-- `diagnostics_summary.rds` - Full MCMC diagnostics
-- `timing_results.csv` - Performance benchmarks
+See `output/` directory for generated plots:
+
+### Code Examples
+- `code-bspline_minimal_example.png` - Basic B-spline fit
+- `code-cspline_minimal_example.png` - Basic C-spline fit
+
+### Test Outputs  
+- `test-basic_spline_comparison.png` - Side-by-side comparison
+- `test-edge_cases_*.png` - Minimal knot configurations
+- `test-flexibility_comparison*.png` - Smoothing parameter effects
+- `test-numerical_accuracy_properties.png` - Mathematical properties
+- `test-diagnostic_recommendations_*.png` - Diagnostic scenarios
+- `test-spline_comparison.png` - Six function types comparison
+- `test-diagnostics_summary.csv` - Diagnostic metrics summary
+
+### Example Outputs
+- `example-hierarchical_decomposition.png` - Regional pattern decomposition
+- `example-hierarchical_model_draws.rds` - Cached model draws
 
 ## Regional/Hierarchical Splines
 
@@ -305,11 +344,11 @@ alpha[r] ~ normal(mu_alpha, tau_alpha);
 
 ### Running Regional Models
 ```r
-# Simple demonstration
-source("demo_regional_splines.R")
+# Hierarchical regional spline example
+source("examples/hierarchical_regional_splines.R")
 
-# Full analysis with visualizations
-source("run_regional_splines.R")
+# Test hierarchical models
+source("tests/test_regional_splines.R")
 ```
 
 ## Using Splines in Your Stan Models
@@ -476,31 +515,36 @@ This project was developed with [Claude Code](https://claude.ai/code), an AI cod
 
 ## Testing
 
-This project includes a comprehensive test suite to verify the correctness and properties of both spline implementations.
+This project includes a comprehensive test suite with 8 tests to verify the correctness and properties of both spline implementations.
 
 ### Test Files
 
 | Test Script | Purpose | Coverage |
 |-------------|---------|----------|
-| `tests/quick_test.R` | Basic functionality check | Quick verification of both implementations |
-| `tests/test_numerical_accuracy.R` | Mathematical properties | Partition of unity, interpolation accuracy, monotonicity |
-| `tests/test_analytical_solutions.R` | Known function fitting | Polynomials, constants, step functions, sine waves |
-| `tests/test_splines.R` | Comprehensive function tests | Multiple function types and edge cases |
+| `tests/test_basic_splines.R` | Basic functionality check | Quick verification with visualization |
+| `tests/test_edge_cases_minimal_knots.R` | Minimal knot configurations | Tests with 2-3 knots, error handling |
+| `tests/test_flexibility_bspline_vs_cspline.R` | Smoothing comparison | B-spline smoothing vs C-spline knots |
+| `tests/test_numerical_accuracy.R` | Mathematical properties | Partition of unity, interpolation, monotonicity |
+| `tests/test_analytical_solutions.R` | Known function fitting | Polynomials, constants, sine waves |
+| `tests/test_diagnostic_recommendations.R` | Diagnostic system | Over/under-smoothing detection |
+| `tests/test_various_target_functions.R` | Comprehensive tests | Six different function types |
 | `tests/test_regional_splines.R` | Hierarchical models | Multi-region splines with shared priors |
 
 ### Running Tests
 
 ```r
-# Run all tests with summary
+# Run all tests with summary (recommended)
 source("run-tests.R")
 
 # Run individual test suites
-source("tests/quick_test.R")                    # Fast basic check
+source("tests/test_basic_splines.R")            # Fast basic check
 source("tests/test_numerical_accuracy.R")       # Mathematical properties
-source("tests/test_analytical_solutions.R")     # Known solutions
-source("tests/test_splines.R")                  # Comprehensive tests
+source("tests/test_diagnostic_recommendations.R") # Diagnostic system
+source("tests/test_various_target_functions.R")  # Comprehensive tests
 source("tests/test_regional_splines.R")         # Hierarchical models
 ```
+
+All tests now generate visualization plots saved to the `output/` directory.
 
 ### Test Coverage
 

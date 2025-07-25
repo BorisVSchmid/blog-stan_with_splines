@@ -15,11 +15,11 @@ all_test_files <- list.files("tests", pattern = "^test_.*\\.R$", full.names = TR
 test_order <- c(
   "test_basic_splines.R",
   "test_edge_cases_minimal_knots.R",
-  "test_flexibility_comparison_bspline_vs_cspline.R",
+  "test_flexibility_bspline_vs_cspline.R",
   "test_numerical_accuracy.R",
   "test_analytical_solutions.R",
-  "test_diagnostics_comparison.R",
-  "test_splines.R",
+  "test_diagnostic_recommendations.R",
+  "test_various_target_functions.R",
   "test_regional_splines.R"
 )
 
@@ -52,11 +52,11 @@ cat("Test files:", paste(basename(all_tests), collapse = ", "), "\n\n")
 test_descriptions <- list(
   "test_basic_splines.R" = "Basic functionality of B-splines and C-splines",
   "test_edge_cases_minimal_knots.R" = "Edge cases with minimal knots (2-3 knots) for both spline types",
-  "test_flexibility_comparison_bspline_vs_cspline.R" = "B-splines vs C-splines smoothing approaches on complex function",
+  "test_flexibility_bspline_vs_cspline.R" = "B-splines vs C-splines smoothing approaches on complex function",
   "test_numerical_accuracy.R" = "Numerical properties (partition of unity, monotonicity)",
   "test_analytical_solutions.R" = "Known analytical solutions (polynomials, constants, sine)",
-  "test_diagnostics_comparison.R" = "Diagnostic comparison between B-splines and C-splines",
-  "test_splines.R" = "Comprehensive spline fitting across multiple scenarios",
+  "test_diagnostic_recommendations.R" = "Diagnostic recommendations for over/under-smoothing",
+  "test_various_target_functions.R" = "Six different target functions with both spline types",
   "test_regional_splines.R" = "Regional hierarchical splines with comprehensive analysis"
 )
 
@@ -189,7 +189,7 @@ cat(sprintf("Total time: %.1f seconds (%.1f minutes)\n", total_time, total_time/
 # Detailed results table
 cat("\nDetailed Results:\n")
 cat(rep("-", 140), "\n", sep = "")
-cat(sprintf("%-35s %-15s %10s  %s\n", "Test File", "Status", "Time (s)", "Purpose"))
+cat(sprintf("%-37s %-15s %10s  %s\n", "Test File", "Status", "Time (s)", "Purpose"))
 cat(rep("-", 140), "\n", sep = "")
 
 
@@ -238,7 +238,7 @@ for (test_name in all_test_names) {
     description <- paste0(substr(description, 1, 77), "...")
   }
   
-  cat(sprintf("%-35s %-15s %10.1f  %s\n", test_name, status_display, time, description))
+  cat(sprintf("%-37s %-15s %10.1f  %s\n", test_name, status_display, time, description))
 }
 
 cat(rep("-", 140), "\n", sep = "")
@@ -270,11 +270,11 @@ if (failed_tests > 0) {
 # Test categories summary
 cat("\n\nTest Categories:\n")
 cat(rep("-", 140), "\n", sep = "")
-cat("Core functionality:  test_basic_splines.R, test_3_knots.R\n")
+cat("Core functionality:  test_basic_splines.R, test_edge_cases_minimal_knots.R\n")
 cat("Mathematical tests:  test_numerical_accuracy.R, test_analytical_solutions.R\n")
-cat("Parameter tests:     test_smoothing_comparison.R\n")
-cat("Diagnostic tests:    test_diagnostics_both_splines.R\n")
-cat("Advanced tests:      test_splines.R, test_regional_splines*.R\n")
+cat("Parameter tests:     test_flexibility_bspline_vs_cspline.R\n")
+cat("Diagnostic tests:    test_diagnostic_recommendations.R\n")
+cat("Advanced tests:      test_various_target_functions.R, test_regional_splines.R\n")
 
 # Final status
 cat("\n", rep("=", 60), "\n", sep = "")

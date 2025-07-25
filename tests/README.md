@@ -20,25 +20,55 @@ Rscript test_basic_splines.R
 
 ### Core Functionality Tests (2)
 1. **test_basic_splines.R** - Essential functionality for both B-splines and C-splines
+   - Fits simple sine function with both spline types
+   - Creates comparison plot showing fitted curves with uncertainty intervals
+   - Outputs: `test-basic_spline_comparison.png`
+
 2. **test_edge_cases_minimal_knots.R** - Edge case testing with minimal knot configurations
    - Tests both B-splines and C-splines with 2 and 3 knots
    - Verifies error handling for insufficient knots
    - Shows limitations of minimal flexibility
+   - Outputs: `test-edge_cases_2knots_bspline.png`, `test-edge_cases_3knots_comparison.png`
 
 ### Mathematical Property Tests (2)
-3. **test_numerical_accuracy.R** - Verifies mathematical properties (partition of unity, monotonicity)
-4. **test_analytical_solutions.R** - Tests against known analytical solutions (polynomials, constants, sine)
+3. **test_numerical_accuracy.R** - Verifies mathematical properties
+   - Partition of unity test for B-splines
+   - Linear function interpolation for both spline types
+   - Interpolation accuracy at data points
+   - Monotonicity preservation
+   - Outputs: `test-numerical_accuracy_properties.png`
+
+4. **test_analytical_solutions.R** - Tests against known analytical solutions
+   - Polynomials (degree 1-3)
+   - Constant functions
+   - Sine functions
+   - Tests both spline types against each function
 
 ### Parameter and Comparison Tests (2)
-5. **test_flexibility_comparison_bspline_vs_cspline.R** - Compares B-spline smoothing vs C-spline knot control
-   - B-splines: Fixed knots (n/2), varying smoothing_strength (1, 2, 4, 8, 15)
+5. **test_flexibility_bspline_vs_cspline.R** - Compares smoothing approaches
+   - B-splines: Fixed knots (n/2), varying smoothing_strength (0, 2, 4, 6, 8)
    - C-splines: Varying number of knots (13, 11, 9, 7, 5)
    - Shows how both approaches achieve similar flexibility through different mechanisms
-6. **test_diagnostics_comparison.R** - Diagnostic comparison between B-splines and C-splines
+   - Outputs: `test-flexibility_comparison.png`, `test-flexibility_comparison_summary.png`
+
+6. **test_diagnostic_recommendations.R** - Tests diagnostic system
+   - Four scenarios: B-spline normal, C-spline normal, B-spline overfitting, C-spline over-smoothing
+   - Verifies diagnostic metrics detect problems correctly
+   - Shows how recommendations adapt to context
+   - Outputs: `test-diagnostic_recommendations_scenarios.png`, `test-diagnostic_metrics_comparison.png`
 
 ### Advanced Tests (2)
-7. **test_splines.R** - Comprehensive spline fitting across multiple scenarios
-8. **test_regional_splines.R** - Regional hierarchical splines with comprehensive analysis
+7. **test_various_target_functions.R** - Tests six different target functions
+   - Sine, polynomial (degree 3), step function, exponential, complex (sin + cos), linear
+   - Both B-splines and C-splines fitted to each function
+   - Creates comprehensive comparison plots
+   - Outputs: `test-spline_comparison.png`, `test-diagnostics_summary.csv`
+
+8. **test_regional_splines.R** - Regional hierarchical splines
+   - Tests hierarchical model with region-specific spline coefficients
+   - Variance component analysis
+   - Comprehensive visualization of results
+   - Uses custom Stan model: `test_regional_splines.stan`
 
 ## Test Categories
 
@@ -78,6 +108,18 @@ Successful test runs will show:
 - Detailed results table with all 8 tests
 - Summary statistics
 
+### Generated Plots
+
+All tests now generate visualization plots saved to the `output/` directory:
+
+1. **Basic functionality**: `test-basic_spline_comparison.png`
+2. **Edge cases**: `test-edge_cases_2knots_bspline.png`, `test-edge_cases_3knots_comparison.png`
+3. **Numerical accuracy**: `test-numerical_accuracy_properties.png`
+4. **Flexibility comparison**: `test-flexibility_comparison.png`, `test-flexibility_comparison_summary.png`
+5. **Diagnostic recommendations**: `test-diagnostic_recommendations_scenarios.png`, `test-diagnostic_metrics_comparison.png`
+6. **Various target functions**: `test-spline_comparison.png`, `test-diagnostics_summary.csv`
+7. **Regional splines**: Multiple plots showing variance components and regional fits
+
 ### MCMC Diagnostics
 All test files now output MCMC diagnostic summaries after model fitting, showing:
 - Number of divergent transitions per chain
@@ -103,7 +145,7 @@ All models are now configured to run 4 chains in parallel for better sampling an
 
 Example output:
 ```
-[1/9] Running test_basic_splines.R
+[1/8] Running test_basic_splines.R
 Purpose: Basic functionality of B-splines and C-splines
 ----------------------------------------------------------------------
 Testing B-spline model...

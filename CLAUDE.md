@@ -10,12 +10,20 @@ This project was built collaboratively with Claude Code to:
 - Implement advanced features like smoothing priors and regional hierarchical models
 - Document best practices and usage patterns for Stan splines
 
+The development process involved iterative refinement, with Claude Code helping to:
+- Debug Stan compilation issues and syntax requirements
+- Implement proper uncertainty quantification
+- Create visualizations using ggplot2 with appropriate themes
+- Ensure proper attribution and licensing compliance
+- Organize code following R package conventions
+
 ## Project Structure
 
-- `code/` - Core Stan models and R functions (bsplines.stan, csplines.stan, smoothing_diagnostics.R)
-- `tests/` - Test scripts for verifying implementations (9 test files)
-- `examples/` - Example analyses and demonstrations (hierarchical regional splines)
-- `output/` - Generated plots and results (all test outputs saved here)
+- `code/` - Core Stan models and R functions
+- `tests/` - Test scripts for verifying implementations
+- `examples/` - Example analyses and demonstrations
+- `output/` - Generated plots and results
+- `claude-tmp/` - Temporary/experimental scripts created by Claude (not part of main project)
 
 ## Commands
 
@@ -27,7 +35,7 @@ source("run-code.R")
 # Run extended examples (complex analyses, comparisons)
 source("run-examples.R")
 
-# Run complete test suite (all 9 tests)
+# Run complete test suite (all 8 tests)
 source("run-tests.R")
 ```
 
@@ -38,9 +46,9 @@ source("code/bsplines.R")   # B-spline minimal example
 source("code/csplines.R")   # C-spline minimal example
 
 # Run specific tests
-source("tests/test_basic_splines.R")         # Quick functionality check
-source("tests/test_splines.R")               # Comprehensive testing
-source("tests/test_regional_splines.R")      # Hierarchical models
+source("tests/test_basic_splines.R")              # Quick functionality check
+source("tests/test_various_target_functions.R")   # Comprehensive testing
+source("tests/test_regional_splines.R")           # Hierarchical models
 
 # Run examples
 source("examples/hierarchical_regional_splines.R")
@@ -88,16 +96,15 @@ All models now run with:
 
 ### Testing Framework
 
-The test suite (`run-tests.R`) includes 9 tests in order of complexity:
+The test suite (`run-tests.R`) includes 8 tests in order of complexity:
 1. `test_basic_splines.R` - Basic functionality check
-2. `test_3_knots.R` - Minimal knot configuration
-3. `test_smoothing_strength.R` - Smoothing parameter effects
+2. `test_edge_cases_minimal_knots.R` - Minimal knot configuration (2-3 knots)
+3. `test_flexibility_bspline_vs_cspline.R` - Smoothing parameter effects
 4. `test_numerical_accuracy.R` - Mathematical properties
 5. `test_analytical_solutions.R` - Known function fitting
-6. `test_edf_knot_response.R` - Effective degrees of freedom
-7. `test_diagnostics_both_splines.R` - Diagnostic comparison
-8. `test_splines.R` - Comprehensive scenarios
-9. `test_regional_splines.R` - Hierarchical models
+6. `test_diagnostic_recommendations.R` - Diagnostic system testing
+7. `test_various_target_functions.R` - Comprehensive scenarios (6 functions)
+8. `test_regional_splines.R` - Hierarchical models
 
 ## Critical Stan Requirements
 
