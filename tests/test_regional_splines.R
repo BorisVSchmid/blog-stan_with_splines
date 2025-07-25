@@ -54,7 +54,7 @@ stan_data <- list(
   region = data$region,
   num_knots = 8,
   spline_degree = 3,
-  smoothing_strength = 1.0,  # Mild smoothing
+  smoothing_strength = 2.0,  # Mild smoothing
   prior_scale = 2 * sd(data$y)  # Data-driven prior
 )
 

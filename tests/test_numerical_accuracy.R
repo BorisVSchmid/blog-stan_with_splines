@@ -53,7 +53,8 @@ test_bspline_partition_unity <- function() {
   fit <- model$sample(
     data = stan_data,
     init = init_fun,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 500,
     refresh = 0,
@@ -118,7 +119,8 @@ test_linear_interpolation <- function() {
   fit_b <- model_b$sample(
     data = stan_data_b,
     init = init_fun_b,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 500,
     refresh = 0,
@@ -146,7 +148,8 @@ test_linear_interpolation <- function() {
   cat("  [Test 2 - C-spline linear interpolation] Fitting model...\n")
   fit_c <- model_c$sample(
     data = stan_data_c,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 500,
     refresh = 0,
@@ -197,7 +200,8 @@ test_interpolation_accuracy <- function() {
   cat("  [Test 3 - C-spline second derivative smoothness] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 500,
     refresh = 0,
@@ -248,7 +252,8 @@ test_monotonicity <- function() {
   cat("  [Test 4 - C-spline monotonicity preservation] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 500,
     refresh = 0,

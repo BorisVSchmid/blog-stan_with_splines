@@ -42,11 +42,16 @@ model <- cmdstan_model("code/csplines.stan")
 
 fit <- model$sample(
   data = stan_data,
-  chains = 2,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 500,
   iter_sampling = 1000,
   refresh = 0
 )
+
+# Print diagnostic summary
+cat("\nMCMC Diagnostic Summary:\n")
+print(fit$diagnostic_summary())
 
 # Run smoothing diagnostics
 cat("\n")
@@ -105,7 +110,7 @@ p <- ggplot() +
     x = "x",
     y = "y"
   ) +
-  ylim(-1.6, 3.6) +  # Adjusted range for 0.2*x linear term
+  ylim(-1.6, 3.8) +  # Adjusted range for 0.2*x linear term
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "bottom",

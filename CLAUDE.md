@@ -10,51 +10,49 @@ This project was built collaboratively with Claude Code to:
 - Implement advanced features like smoothing priors and regional hierarchical models
 - Document best practices and usage patterns for Stan splines
 
-The development process involved iterative refinement, with Claude Code helping to:
-- Debug Stan compilation issues and syntax requirements
-- Implement proper uncertainty quantification
-- Create visualizations using ggplot2 with appropriate themes
-- Ensure proper attribution and licensing compliance
-- Organize code following R package conventions
-
 ## Project Structure
 
-- `code/` - Core Stan models and R functions
-- `tests/` - Test scripts for verifying implementations
-- `examples/` - Example analyses and demonstrations
-- `output/` - Generated plots and results
-- `claude-tmp/` - Temporary/experimental scripts created by Claude (not part of main project)
+- `code/` - Core Stan models and R functions (bsplines.stan, csplines.stan, smoothing_diagnostics.R)
+- `tests/` - Test scripts for verifying implementations (9 test files)
+- `examples/` - Example analyses and demonstrations (hierarchical regional splines)
+- `output/` - Generated plots and results (all test outputs saved here)
 
 ## Commands
 
-### Running Tests
+### Running the Project
 ```r
-# Run comprehensive test suite (tests multiple functions, creates plots)
-source("test_splines.R")
+# Run minimal code examples (simple demonstrations)
+source("run-code.R")
 
-# Run quick test (simple sine function test)
-source("quick_test.R")
+# Run extended examples (complex analyses, comparisons)
+source("run-examples.R")
+
+# Run complete test suite (all 9 tests)
+source("run-tests.R")
+```
+
+### Running Individual Components
+```r
+# Core implementations
+source("code/bsplines.R")   # B-spline minimal example
+source("code/csplines.R")   # C-spline minimal example
+
+# Run specific tests
+source("tests/test_basic_splines.R")         # Quick functionality check
+source("tests/test_splines.R")               # Comprehensive testing
+source("tests/test_regional_splines.R")      # Hierarchical models
+
+# Run examples
+source("examples/hierarchical_regional_splines.R")
 ```
 
 ### Building Stan Models
-Models are compiled automatically when running tests. To manually compile:
+Models are compiled automatically when running scripts. To manually compile:
 ```r
 library(cmdstanr)
-model_b <- cmdstan_model("test_bsplines.stan")
-model_c <- cmdstan_model("test_csplines.stan")
-```
-
-### Testing Individual Functions
-```r
-# Generate test data
-data <- generate_test_data(n = 30, func_type = "sine", noise_sd = 0.1)
-# func_type options: "sine", "polynomial", "step", "exponential", "complex", "linear"
-
-# Fit B-spline
-fit_b <- fit_bspline(data, num_knots = 7, spline_degree = 3)
-
-# Fit C-spline
-fit_c <- fit_cspline(data, num_knots = 7)
+model_b <- cmdstan_model("code/bsplines.stan")
+model_c <- cmdstan_model("code/csplines.stan")
+model_regional <- cmdstan_model("examples/regional_splines.stan")
 ```
 
 ## Architecture
@@ -63,13 +61,14 @@ fit_c <- fit_cspline(data, num_knots = 7)
 
 The project provides two independent spline implementations in Stan:
 
-1. **B-splines** (`test_bsplines.stan`)
+1. **B-splines** (`code/bsplines.stan`)
    - Self-contained implementation using Cox-de Boor recursive algorithm
    - Function `build_b_spline()` constructs basis functions recursively
    - Knots placed at quantiles with extended boundary knots
    - Number of basis functions = `num_knots + spline_degree - 1`
+   - Includes `smoothing_strength` parameter for scale-invariant smoothing
 
-2. **C-splines** (`test_csplines.stan`)
+2. **C-splines** (`code/csplines.stan`)
    - Depends on `spline.stan` library via `#include`
    - Uses matrix algebra for natural cubic splines
    - Requires all evaluation points within knot range
@@ -80,14 +79,25 @@ The project provides two independent spline implementations in Stan:
 - **B-splines**: Local support means coefficients (`alpha`) directly multiply basis functions
 - **C-splines**: Global support with values specified at knots (`y_at_knots`), then transformed to coefficients
 
+### MCMC Configuration
+
+All models now run with:
+- 4 chains in parallel (`chains = 4, parallel_chains = 4`)
+- Diagnostic summaries printed after each fit (`fit$diagnostic_summary()`)
+- Adaptive parameters for complex models (`adapt_delta`, `max_treedepth`)
+
 ### Testing Framework
 
-`test_splines.R` orchestrates comprehensive testing:
-1. Generates synthetic data with known functions
-2. Fits both spline types with various configurations
-3. Extracts posterior draws and constructs uncertainty intervals
-4. Creates multi-panel plots using patchwork
-5. Saves all outputs to `output/` directory
+The test suite (`run-tests.R`) includes 9 tests in order of complexity:
+1. `test_basic_splines.R` - Basic functionality check
+2. `test_3_knots.R` - Minimal knot configuration
+3. `test_smoothing_strength.R` - Smoothing parameter effects
+4. `test_numerical_accuracy.R` - Mathematical properties
+5. `test_analytical_solutions.R` - Known function fitting
+6. `test_edf_knot_response.R` - Effective degrees of freedom
+7. `test_diagnostics_both_splines.R` - Diagnostic comparison
+8. `test_splines.R` - Comprehensive scenarios
+9. `test_regional_splines.R` - Hierarchical models
 
 ## Critical Stan Requirements
 
@@ -121,8 +131,31 @@ Managed via groundhog with date "2025-06-01":
 
 1. **No Extrapolation**: Both spline types should not extrapolate beyond data range
 2. **Fixed Knots**: Knot positions determined by data quantiles, not optimized
-3. **No Shrinkage**: Neither implementation includes automatic regularization
+3. **No Automatic Shrinkage**: Neither implementation includes automatic regularization (B-splines have optional smoothing_strength)
 4. **Boundary Behavior**: 
    - B-splines: Polynomial continuation at boundaries
    - C-splines: Linear extrapolation (natural boundary conditions)
 5. **C-spline Strictness**: The stan-splines library rejects points outside knot range
+
+## Diagnostics and Output
+
+### Smoothing Diagnostics
+The `code/smoothing_diagnostics.R` file provides:
+- `diagnose_smoothing()`: Calculates EDF, residual patterns, cross-validation metrics
+- `print_smoothing_diagnostics()`: Pretty-prints diagnostic results with recommendations
+- Automated parameter tuning suggestions based on diagnostic metrics
+
+### Output Organization
+- All plots saved to `output/` directory with consistent naming:
+  - `code-*.png`: Output from code examples
+  - `test-*.png`: Output from test scripts
+  - `example-*.png`: Output from example scripts
+- No automatic PDF generation (removed `print()` calls that created Rplots.pdf)
+
+## Regional/Hierarchical Models
+
+The `examples/` directory contains advanced hierarchical implementations:
+- `regional_splines.stan`: Hierarchical B-splines with region-specific deviations
+- Variance component estimation (between vs within-region)
+- Model caching for repeated runs
+- Comprehensive visualization of regional patterns

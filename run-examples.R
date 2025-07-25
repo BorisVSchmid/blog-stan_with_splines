@@ -1,19 +1,15 @@
-# Run all spline examples
-# Demonstrates various capabilities of the B-spline and C-spline implementations
+# Run hierarchical regional splines example
+# Demonstrates how multiple regions can share information through hierarchical priors
 
-cat("Stan Splines - Running All Examples\n")
-cat("===================================\n\n")
+cat("Stan Splines - Running Hierarchical Example\n")
+cat("==========================================\n\n")
 
 # Track timing
 start_time <- Sys.time()
 
 # List of examples to run
 examples <- list(
-  list(name = "Spline comparison plots", file = "examples/generate_plots_extended.R"),
-  list(name = "B-spline smoothing comparison", file = "examples/compare_smoothing.R"),
-  list(name = "Smoothing strength guide", file = "examples/smoothing_strength_guide.R"),
-  list(name = "Diagnostics demonstration", file = "examples/diagnostics_demo.R"),
-  list(name = "Regional splines with hierarchical priors", file = "examples/run_regional_splines.R")
+  list(name = "Hierarchical regional splines", file = "examples/hierarchical_regional_splines.R")
 )
 
 # Run each example

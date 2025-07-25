@@ -43,7 +43,8 @@ stan_data_b <- list(
 model_b <- cmdstan_model("code/bsplines.stan")
 fit_b <- model_b$sample(
   data = stan_data_b,
-  chains = 1,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 200,
   iter_sampling = 500,
   refresh = 0
@@ -70,7 +71,8 @@ stan_data_c <- list(
 model_c <- cmdstan_model("code/csplines.stan")
 fit_c <- model_c$sample(
   data = stan_data_c,
-  chains = 1,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 200,
   iter_sampling = 500,
   refresh = 0
@@ -97,7 +99,8 @@ stan_data_b_overfit <- list(
 
 fit_b_overfit <- model_b$sample(
   data = stan_data_b_overfit,
-  chains = 1,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 200,
   iter_sampling = 500,
   refresh = 0
@@ -120,7 +123,8 @@ stan_data_c_smooth <- list(
 
 fit_c_smooth <- model_c$sample(
   data = stan_data_c_smooth,
-  chains = 1,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 200,
   iter_sampling = 500,
   refresh = 0

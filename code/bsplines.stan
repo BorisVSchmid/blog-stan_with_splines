@@ -40,7 +40,7 @@ data {
   vector[n_data] y;
   int<lower=1> num_knots;
   int<lower=1> spline_degree;
-  real<lower=0> smoothing_strength;  // Smoothing strength (0=none, 1=mild, 10=strong)
+  real<lower=0> smoothing_strength;  // Smoothing strength (0=none, 1-2=mild, 5-10=strong)
   real<lower=0> prior_scale;  // Scale for coefficient priors
 }
 
@@ -57,21 +57,22 @@ transformed data {
   matrix[num_basis, n_data] B;
   
   // Transform smoothing_strength to tau_smooth (random walk SD)
-  // smoothing_strength: 0=none, 1=mild, 10=strong
+  // smoothing_strength: 0=none, 1-2=mild, 5-10=strong (scales with num_basis)
   // tau_smooth: 0=special case for independent, small=smooth, large=flexible
   //
   // CRITICAL: Scale-invariant smoothing implementation
   // The random walk prior is: alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth
-  // To make smoothing strength consistent across different data scales, we scale
-  // tau_smooth by prior_scale (which is proportional to data SD).
-  // Without this scaling, the same smoothing_strength would underfit large-scale
-  // data (e.g., polynomials ranging 0-20) while overfitting small-scale data
-  // (e.g., sine functions ranging -1 to 1).
+  // To make smoothing strength consistent across different data scales AND different
+  // numbers of knots, we scale tau_smooth by both prior_scale (data variance) and
+  // number of basis functions.
+  // Without this scaling, the same smoothing_strength would:
+  // 1. Underfit large-scale data while overfitting small-scale data
+  // 2. Have different effects with different numbers of knots
   real tau_smooth;
   if (smoothing_strength == 0) {
     tau_smooth = 0;  // Special case: triggers independent coefficients
   } else {
-    tau_smooth = prior_scale / sqrt(smoothing_strength);  // Scale by data variance
+    tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis);  // Scale by data variance and number of basis functions
   }
   
   {

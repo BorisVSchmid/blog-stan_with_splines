@@ -16,18 +16,22 @@ stan_data_b <- list(
   y = y,
   num_knots = 5,
   spline_degree = 3,
-  smoothing_strength = 1.0,
+  smoothing_strength = 2.0,
   prior_scale = 2 * sd(y)
 )
 
 model_b <- cmdstan_model("code/bsplines.stan")
 fit_b <- model_b$sample(
   data = stan_data_b,
-  chains = 2,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 500,
   iter_sampling = 500,
   refresh = 0
 )
+
+cat("\nB-spline MCMC diagnostics:\n")
+print(fit_b$diagnostic_summary())
 
 cat("B-spline fit summary:\n")
 fit_b$summary(c("sigma", "lp__"))
@@ -44,11 +48,15 @@ stan_data_c <- list(
 model_c <- cmdstan_model("code/csplines.stan")
 fit_c <- model_c$sample(
   data = stan_data_c,
-  chains = 2,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 500,
   iter_sampling = 500,
   refresh = 0
 )
+
+cat("\nC-spline MCMC diagnostics:\n")
+print(fit_c$diagnostic_summary())
 
 cat("C-spline fit summary:\n")
 fit_c$summary(c("sigma", "lp__"))

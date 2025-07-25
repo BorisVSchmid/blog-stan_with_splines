@@ -42,7 +42,7 @@ data {
   // Spline parameters
   int<lower=1> num_knots;                  // Number of interior knots
   int<lower=1> spline_degree;              // Degree of spline (3 for cubic)
-  real<lower=0> smoothing_strength;        // Smoothing strength (0=none, 1=mild, 10=strong)
+  real<lower=0> smoothing_strength;        // Smoothing strength (0=none, 1-2=mild, 5-10=strong)
   real<lower=0> prior_scale;               // Scale for coefficient priors
 }
 

@@ -1,7 +1,0 @@
-"function_type","spline_type","ess_bulk","ess_tail","rhat","divergences","diagnostics_passed","timestamp"
-"sine","bspline",NA,NA,NA,0,NA,"2025-07-24 15:35:45.351013"
-"sine","cspline",NA,NA,NA,0,NA,"2025-07-24 15:35:45.351013"
-"polynomial","bspline",NA,NA,NA,1,NA,"2025-07-24 15:35:45.351013"
-"polynomial","cspline",NA,NA,NA,0,NA,"2025-07-24 15:35:45.351013"
-"complex","bspline",NA,NA,NA,0,NA,"2025-07-24 15:35:45.351013"
-"complex","cspline",NA,NA,NA,0,NA,"2025-07-24 15:35:45.351013"

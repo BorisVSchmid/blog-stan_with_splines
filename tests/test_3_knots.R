@@ -1,5 +1,8 @@
 # Test B-splines with 3 knots
 
+# Suppress default graphics device to prevent Rplots.pdf
+pdf(NULL)
+
 library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
@@ -28,7 +31,7 @@ stan_data <- list(
   y = y,
   num_knots = 3,  # Minimal knots
   spline_degree = 3,
-  smoothing_strength = 1.0,
+  smoothing_strength = 2.0,
   prior_scale = 2 * sd(y)
 )
 
@@ -41,11 +44,16 @@ model <- cmdstan_model("code/bsplines.stan")
 
 fit <- model$sample(
   data = stan_data,
-  chains = 2,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 500,
   iter_sampling = 1000,
   refresh = 0
 )
+
+# Print diagnostic summary
+cat("\nMCMC Diagnostic Summary:\n")
+print(fit$diagnostic_summary())
 
 # Run smoothing diagnostics
 cat("\n")
@@ -100,8 +108,7 @@ p <- ggplot() +
     title = paste0("B-spline Fit with ", stan_data$num_knots, " Knots (", 
                    stan_data$num_knots + stan_data$spline_degree - 1, " Basis Functions)"),
     subtitle = paste0("True function: sin(x) + 0.4*cos(3x) + 0.2*x | Smoothing strength = ", stan_data$smoothing_strength),
-    caption = paste0("EDF = ", round(diagnosis$edf, 1), 
-                     ", Sigma = ", round(sigma, 3),
+    caption = paste0("Sigma = ", round(sigma, 3),
                      ", Autocorrelation = ", round(diagnosis$residual_autocor, 3)),
     x = "x",
     y = "y"
@@ -113,11 +120,10 @@ p <- ggplot() +
         legend.title = element_blank()) +
   guides(fill = guide_legend(order = 2), color = guide_legend(order = 1))
 
-# Display the plot
-print(p)
-
 # Save the plot
-ggsave("claude-tmp/bspline_3_knots.png", p, width = 8, height = 6, dpi = 300)
+dir.create("output", showWarnings = FALSE)
+ggsave("output/test-bspline_3_knots.png", p, width = 8, height = 6, dpi = 300)
+cat("\nSaved 3-knot B-spline plot to output/test-bspline_3_knots.png\n")
 
 # Print summary
 cat("\nModel Summary:\n")
@@ -126,3 +132,6 @@ cat("Estimated noise (σ):", round(sigma, 3), "\n")
 cat("Number of knots specified:", 3, "\n")
 cat("Number of basis functions:", 5, "(knots + degree - 1)\n")
 cat("RMSE from true function:", round(sqrt(mean((data_points$y_hat - data_points$y_true)^2)), 3), "\n")
+
+# Close the null device
+dev.off()

@@ -16,6 +16,13 @@ library(cmdstanr)
 # Source smoothing diagnostics
 source("code/smoothing_diagnostics.R")
 
+# Note on knot selection:
+# We use simple rules based on sample size rather than trying to estimate
+# function complexity from noisy data. The key insight is that the smoothing
+# prior in B-splines is scale-invariant in x-space (operates knot-to-knot),
+# so we can use a generous number of knots and let the smoothing prior
+# control flexibility.
+
 # Generate test data with complex function
 set.seed(123)
 n <- 40
@@ -24,15 +31,15 @@ y_true <- sin(x) + 0.4 * cos(3*x) + 0.25*x
 y <- y_true + rnorm(n, 0, 0.15)
 
 # Key features demonstration:
-# 1. Adaptive knot selection based on data size
-# Rule of thumb: n/2 for B-splines (with smoothing)
+# 1. Simple knot selection based on sample size
+# Use n/2 knots for B-splines (with smoothing to control flexibility)
 adaptive_knots <- max(4, min(round(n/2), 40))
 
 # 2. Adaptive prior scale based on data variance
 adaptive_prior <- 2 * sd(y)
 
 # 3. Default smoothing for more stable fits
-# smoothing_strength: 0=none, 1=mild, 10=strong
+# smoothing_strength: 0=none, 1-2=mild, 5-10=strong
 
 # Prepare data for Stan
 stan_data <- list(
@@ -41,7 +48,7 @@ stan_data <- list(
   y = y,
   num_knots = adaptive_knots,     # Use adaptive knot selection (n/2)
   spline_degree = 3,              # Cubic splines (most common)
-  smoothing_strength = 5.0,       # Moderate smoothing
+  smoothing_strength = 2,         # Default smoothing (moderate for typical data with new scaling)
   prior_scale = adaptive_prior    # Data-driven prior
 )
 
@@ -50,18 +57,22 @@ cat("Compiling B-spline model...\n")
 model <- cmdstan_model("code/bsplines.stan")
 
 cat("Fitting model with:\n")
-cat("  - Number of knots:", stan_data$num_knots, "\n")
+cat("  - Number of knots:", stan_data$num_knots, "(n/2 rule)\n")
 cat("  - Prior scale:", round(adaptive_prior, 2), "(based on data variance)\n")
 cat("  - Smoothing strength:", stan_data$smoothing_strength, "\n")
-cat(sprintf("  - Note: Recommended knots based on sample size (n = %d) is %d\n\n", n, adaptive_knots))
 
 fit <- model$sample(
   data = stan_data,
-  chains = 2,
+  chains = 4,
+  parallel_chains = 4,
   iter_warmup = 500,
   iter_sampling = 1000,
   refresh = 0
 )
+
+# Print diagnostic summary
+cat("\nMCMC Diagnostic Summary:\n")
+print(fit$diagnostic_summary())
 
 # Run smoothing diagnostics
 cat("\n")
@@ -116,13 +127,12 @@ p <- ggplot() +
     title = "B-spline Fit Demonstrating Key Features",
     subtitle = "True function: sin(x) + 0.4*cos(3x) + 0.25*x",
     caption = paste0("Parameters: knots = ", stan_data$num_knots, 
-                     ", prior_scale = ", round(stan_data$prior_scale, 1),
                      ", smoothing_strength = ", stan_data$smoothing_strength,
                      ", Estimated sigma = ", round(sigma, 3)),
     x = "x",
     y = "y"
   ) +
-  ylim(-1.6, 3.6) +  # Adjusted range for 0.2*x linear term
+  ylim(-1.6, 3.8) +  # Adjusted range for 0.2*x linear term
   theme_bw() +
   theme(plot.title = element_text(hjust = 0.5),
         legend.position = "bottom",

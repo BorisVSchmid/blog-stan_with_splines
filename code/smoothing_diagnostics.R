@@ -9,7 +9,7 @@
 #
 # WRONG - Hard-coded multipliers:
 #   "Increase prior_scale (try multiplying by 2-5)"
-#   "Set smoothing_strength to 10-100"
+#   "Set smoothing_strength to 40-100"
 #
 # RIGHT - Data-driven suggestions:
 #   "Increase prior_scale (autocorrelation 0.45 suggests multiplying by 2.4)"
@@ -35,14 +35,19 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   n <- length(y)
   
   # 1. Effective degrees of freedom (approximate)
-  # For splines, EDF approximates the number of parameters used
-  # Maximum EDF = number of basis functions + intercept
+  # WARNING: This is a crude approximation that doesn't account for smoothing priors!
+  # For regularized splines, true EDF is much lower than the number of parameters.
+  # This calculation assumes all parameters contribute equally, which is false
+  # when smoothing_strength > 0. Use with caution!
   
   # Simple approximation based on model structure
+  # For B-splines: num_basis = num_knots + spline_degree - 1
+  # Total parameters = num_basis + 1 (for intercept alpha_0)
   if (model_type == "bspline" && "spline_degree" %in% names(stan_data)) {
     max_edf <- stan_data$num_knots + stan_data$spline_degree - 1 + 1  # +1 for intercept
   } else {
-    max_edf <- stan_data$num_knots + 1  # +1 for intercept  
+    # For C-splines: parameters = num_knots (y_at_knots)
+    max_edf <- stan_data$num_knots
   }
   
   # Approximate EDF using ratio of residual variance to total variance
@@ -115,10 +120,10 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   
   # Analyze primary indicators with thresholds
   # Good ranges:
-  # - EDF: between 40-80% of max possible EDF
   # - Autocorrelation: < 0.2
   # - Runs test: 0.4-0.6 (roughly half sign changes)
   # - Smoothness: < 1.5 * residual_sd
+  # Note: EDF thresholds removed - not meaningful for regularized splines
   
   # EDF thresholds based on proportion of available parameters used
   edf_ratio <- edf / max_edf
@@ -139,10 +144,10 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   smoothness_severity <- if (!is.na(smoothness)) max(0, (smoothness - residual_sd) / residual_sd) else 0
   
   # Determine smoothing state
-  # High EDF with high autocorrelation might indicate model misspecification
+  # High autocorrelation with many parameters might indicate model misspecification
   if (high_edf && high_autocor) {
     warnings <- c(warnings, 
-      "High EDF with high autocorrelation suggests possible model misspecification",
+      "High autocorrelation despite many parameters suggests possible model misspecification",
       "The function may have features that the current spline configuration cannot capture")
     # Don't give contradictory advice in this case
   } else if (high_autocor || few_runs || low_edf) {
@@ -154,7 +159,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   } else if (high_edf || high_smoothness) {
     # Classic overfitting (too flexible, not smooth enough)
     overfitted <- TRUE
-    if (high_edf) warnings <- c(warnings, sprintf("Very high effective degrees of freedom (%.1f of %d possible) suggests overfitting", edf, max_edf))
+    if (high_edf) warnings <- c(warnings, "Model may be using too many parameters - consider more smoothing")
     if (high_smoothness) warnings <- c(warnings, "High variability in second differences suggests overfitting")
   }
   
@@ -191,8 +196,8 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       # B-spline specific recommendations - reduce smoothing or add knots
       min_knots <- max(4, min(round(n/4), 40))
       
-      if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 10) {
-        suggested_strength <- max(1, diagnosis$smoothing_strength / 2)
+      if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 5) {
+        suggested_strength <- max(2, diagnosis$smoothing_strength / 2)
         suggestions <- c(suggestions,
           sprintf("  - Reduce smoothing_strength to %.0f (current: %.1f)",
                   suggested_strength, diagnosis$smoothing_strength)
@@ -305,12 +310,12 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   
   if (!over_smoothed && !overfitted && !high_edf && !high_autocor) {
     # Check if in good range
-    if (edf_ratio >= 0.4 && edf_ratio <= 0.8 && residual_autocor < 0.2 && runs_test > 0.3 && runs_test < 0.7) {
+    if (residual_autocor < 0.2 && runs_test > 0.3 && runs_test < 0.7) {
       suggestions <- c(suggestions, 
         "Smoothing level appears appropriate:",
-        sprintf("  - EDF %.1f of max %.0f (%.0f%% utilization)", edf, max_edf, edf_ratio * 100),
         sprintf("  - Residual autocorrelation %.3f is low (< 0.2)", residual_autocor),
-        sprintf("  - Runs test %.3f indicates good randomness", runs_test)
+        sprintf("  - Runs test %.3f indicates good randomness", runs_test),
+        "  - Visual inspection confirms reasonable fit"
       )
     } else {
       # Borderline case - give gentle suggestions
@@ -351,6 +356,14 @@ print_smoothing_diagnostics <- function(diagnosis) {
   } else {
     cat("\n")
   }
+  
+  # Add total parameters line for clarity
+  if (!is.na(diagnosis$num_basis) && diagnosis$has_bspline_params) {
+    cat(sprintf("Total parameters: %d (basis + intercept)\n", diagnosis$num_basis + 1))
+  } else if (!is.na(diagnosis$num_knots)) {
+    cat(sprintf("Total parameters: %d (knot values)\n", diagnosis$num_knots))
+  }
+  
   if (!is.na(diagnosis$smoothing_strength)) {
     cat(sprintf("Smoothing strength: %.1f\n", diagnosis$smoothing_strength))
   }
@@ -363,7 +376,6 @@ print_smoothing_diagnostics <- function(diagnosis) {
   # Add help option
   if (!is.null(diagnosis$show_help) && diagnosis$show_help) {
     cat("\nDiagnostic Metrics Explained:\n")
-    cat("- Effective degrees of freedom (EDF): Measures model complexity. Higher = more flexible\n")
     cat("- Residual autocorrelation: Correlation between adjacent residuals. High values suggest over-smoothing\n")
     cat("- Residual SD: Standard deviation of residuals. Should be close to true noise level\n")
     cat("- LOO RMSE: Leave-one-out cross-validation error. Lower is better\n")
@@ -371,35 +383,45 @@ print_smoothing_diagnostics <- function(diagnosis) {
     cat("- Runs test: Proportion of sign changes in residuals. ~0.5 is ideal (random pattern)\n\n")
   }
   
-  # Calculate max EDF for context
-  max_edf <- ifelse(!is.na(diagnosis$num_basis), diagnosis$num_basis + 1, diagnosis$num_knots + 1)
-  edf_percent <- (diagnosis$edf / max_edf) * 100
-  cat(sprintf("Effective degrees of freedom: %.1f of %d possible (%.0f%%)\n", 
-              diagnosis$edf, max_edf, edf_percent))
-  cat("  → Measures model flexibility (higher = more wiggly)\n")
-  
+  # Primary diagnostics first
   # Autocorrelation with interpretation
-  autocor_level <- ifelse(diagnosis$residual_autocor > 0.3, " (high)", 
-                          ifelse(diagnosis$residual_autocor > 0.2, " (moderate)", " (low)"))
-  cat(sprintf("Residual autocorrelation: %.3f%s\n", diagnosis$residual_autocor, autocor_level))
-  cat("  → Pattern in residuals (high = over-smoothed)\n")
+  autocor_level <- ifelse(diagnosis$residual_autocor > 0.3, "high", 
+                          ifelse(diagnosis$residual_autocor > 0.2, "moderate", "low"))
+  cat(sprintf("Residual autocorrelation:      %5.3f (%s)        → Pattern in residuals (high = over-smoothed)\n", 
+              diagnosis$residual_autocor, autocor_level))
   
-  cat(sprintf("Residual SD: %.3f\n", diagnosis$residual_sd))
-  cat("  → Spread of residuals (compare to estimated σ)\n")
+  runs_status <- ifelse(abs(diagnosis$runs_proportion - 0.5) < 0.1, "good",
+                       ifelse(diagnosis$runs_proportion < 0.3, "poor",
+                              ifelse(diagnosis$runs_proportion > 0.7, "poor", "fair")))
+  cat(sprintf("Runs test:                     %5.3f (%s)      → Randomness of residuals (0.5 = ideal)\n", 
+              diagnosis$runs_proportion, runs_status))
   
-  cat(sprintf("LOO RMSE: %.3f\n", diagnosis$loo_rmse))
-  cat("  → Cross-validation error (lower = better predictions)\n")
+  cat(sprintf("Residual SD:                   %5.3f             → Spread of residuals (compare to σ=%.3f)\n", 
+              diagnosis$residual_sd, diagnosis$sigma_estimate))
   
   if (!is.na(diagnosis$smoothness)) {
-    cat(sprintf("Smoothness (2nd diff SD): %.3f\n", diagnosis$smoothness))
-    cat("  → Curvature variation (high = wiggly fit)\n")
+    cat(sprintf("Smoothness (2nd diff SD):      %5.3f             → Curvature variation (high = wiggly)\n", 
+                diagnosis$smoothness))
   }
   
-  runs_interp <- ifelse(abs(diagnosis$runs_proportion - 0.5) < 0.1, " (good randomness)",
-                       ifelse(diagnosis$runs_proportion < 0.3, " (few sign changes)",
-                              ifelse(diagnosis$runs_proportion > 0.7, " (many sign changes)", "")))
-  cat(sprintf("Runs test: %.3f%s\n", diagnosis$runs_proportion, runs_interp))
-  cat("  → Randomness of residuals (0.5 = ideal)\n")
+  cat(sprintf("LOO RMSE:                      %5.3f             → Cross-validation error (lower = better)\n", 
+              diagnosis$loo_rmse))
+  
+  # EDF at the end with clear caveat
+  if (!is.na(diagnosis$num_basis) && diagnosis$has_bspline_params) {
+    max_edf <- diagnosis$num_basis + 1  # B-spline with intercept
+  } else {
+    max_edf <- diagnosis$num_knots  # C-spline (y_at_knots includes intercept)
+  }
+  
+  cat("\nModel complexity (use with caution):\n")
+  cat(sprintf("  Parameters: %d basis functions + 1 intercept = %d total\n", 
+              diagnosis$num_basis, diagnosis$num_basis + 1))
+  if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
+    cat(sprintf("  Approximate EDF: %.1f (unreliable for regularized splines)\n", diagnosis$edf))
+  } else {
+    cat(sprintf("  Approximate EDF: %.1f (no smoothing applied)\n", diagnosis$edf))
+  }
   
   # Assessment section
   cat("\nAssessment: ")
@@ -426,13 +448,13 @@ print_smoothing_diagnostics <- function(diagnosis) {
     }
     # Add general advice about parameter adjustment
     cat("\nParameter adjustment guide:\n")
-    cat("- smoothing_strength: 0=none, 1=mild, 10=strong smoothing\n")
+    cat("- smoothing_strength: 0=none, 1-2=mild, 5-10=strong smoothing (scales with number of basis functions)\n")
     cat("- num_knots: Keep high enough to capture function complexity, adjust smoothing for regularization\n")
     
     cat("\nInterpreting the metrics:\n")
-    cat("- Good fit: EDF 40-80% of max, autocorr < 0.2, runs test ~0.5\n")
-    cat("- Overfitting: High EDF (>90%), high smoothness, low residual SD\n")
-    cat("- Over-smoothing: Low EDF (<30%), high autocorr (>0.3), runs test far from 0.5\n")
+    cat("- Good fit: Autocorr < 0.2, runs test ~0.5, reasonable visual appearance\n")
+    cat("- Overfitting: High smoothness measure, very low residual SD, wiggly appearance\n")
+    cat("- Over-smoothing: High autocorr (>0.3), runs test far from 0.5, systematic residual patterns\n")
   } else {
     cat("No adjustments needed - model fit appears appropriate.\n")
   }
@@ -482,7 +504,7 @@ example_diagnostics <- function() {
     y = y,
     num_knots = 4,      # Few knots
     spline_degree = 3,
-    smoothing_strength = 50  # Strong smoothing
+    smoothing_strength = 10  # Strong smoothing
   )
   
   cat("\nFitting with restrictive settings (likely to over-smooth)...\n")

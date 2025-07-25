@@ -43,14 +43,29 @@ generate_test_data <- function(n = 50, func_type = "sine", noise_sd = 0.1) {
   list(x = x, y = y, y_true = y_true, func_type = func_type)
 }
 
+# Note on adaptive knot selection:
+# We explored using function complexity to determine knot placement, but this approach
+# has fundamental limitations:
+# 1. Sampling density bias: Oversampled regions would get more knots than undersampled regions
+# 2. Noise sensitivity: Noisy data could artificially increase estimated complexity
+# 3. Scale dependency: Despite efforts to normalize, some metrics remained scale-sensitive
+# 
+# Instead, we use simple rules based on sample size:
+# - B-splines: n/2 knots (with smoothing prior to handle flexibility)
+# - C-splines: n/4 knots (global support requires fewer knots)
+# 
+# The smoothing prior in B-splines is scale-invariant in x-space because it operates
+# on adjacent coefficients (knot-to-knot), not on the x-scale directly.
+
 # Function to fit B-spline model
 fit_bspline <- function(data, num_knots = NULL, spline_degree = 3, 
-                        smoothing_strength = 5.0,
-                        chains = 2, iter_warmup = 500, iter_sampling = 1000) {
+                        smoothing_strength = 2,
+                        chains = 4, iter_warmup = 500, iter_sampling = 1000) {
   
-  # Adaptive knot selection if not specified
+  # Simple knot selection based on sample size
   if (is.null(num_knots)) {
     n <- length(data$x)
+    # B-splines with smoothing can handle more knots
     num_knots <- max(4, min(round(n/2), 40))
   }
   
@@ -74,7 +89,9 @@ fit_bspline <- function(data, num_knots = NULL, spline_degree = 3,
     parallel_chains = chains,
     iter_warmup = iter_warmup,
     iter_sampling = iter_sampling,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.99,
+    max_treedepth = 15
   )
   
   # Store stan_data as an attribute
@@ -85,12 +102,13 @@ fit_bspline <- function(data, num_knots = NULL, spline_degree = 3,
 
 # Function to fit C-spline model
 fit_cspline <- function(data, num_knots = NULL, 
-                        chains = 2, iter_warmup = 500, iter_sampling = 1000) {
+                        chains = 4, iter_warmup = 500, iter_sampling = 1000) {
   
-  # Adaptive knot selection if not specified
+  # Simple knot selection based on sample size
   if (is.null(num_knots)) {
     n <- length(data$x)
-    num_knots <- max(4, min(round(n/4), 40))
+    # C-splines with global support need fewer knots
+    num_knots <- max(4, min(round(n/4), 30))
   }
   
   stan_data <- list(
@@ -110,7 +128,9 @@ fit_cspline <- function(data, num_knots = NULL,
     parallel_chains = chains,
     iter_warmup = iter_warmup,
     iter_sampling = iter_sampling,
-    refresh = 0
+    refresh = 0,
+    adapt_delta = 0.99,
+    max_treedepth = 15
   )
   
   # Store stan_data as an attribute
@@ -247,7 +267,7 @@ cat("Test 1: Sine function\n")
 data_sine <- generate_test_data(n = 30, func_type = "sine", noise_sd = 0.1)
 
 cat("  [Test 1 - B-spline sine function] Fitting model...\n")
-fit_b_sine <- fit_bspline(data_sine)  # Will use n/2 = 15 knots
+fit_b_sine <- fit_bspline(data_sine)  # Default: n/2 knots
 diag_b_sine <- check_diagnostics(fit_b_sine, "B-spline (sine)")
 # Extract actual parameters from the fit
 b_sine_knots <- attr(fit_b_sine, "stan_data")$num_knots
@@ -257,7 +277,7 @@ plots_b_sine <- plot_spline_fit(fit_b_sine, data_sine, "B-spline", show_basis = 
                                 params = paste0("knots=", b_sine_knots, ", degree=", b_sine_degree, ", smoothing=", b_sine_smooth))
 
 cat("\n  [Test 1 - C-spline sine function] Fitting model...\n")
-fit_c_sine <- fit_cspline(data_sine)  # Will use n/4 = 7.5 ≈ 8 knots
+fit_c_sine <- fit_cspline(data_sine)  # Default: n/4 knots
 diag_c_sine <- check_diagnostics(fit_c_sine, "C-spline (sine)")
 # Extract actual parameters from the fit
 c_sine_knots <- attr(fit_c_sine, "stan_data")$num_knots
@@ -269,7 +289,7 @@ cat("\n\nTest 2: Polynomial function\n")
 data_poly <- generate_test_data(n = 40, func_type = "polynomial", noise_sd = 0.2)
 
 cat("  [Test 2 - B-spline polynomial function] Fitting model...\n")
-fit_b_poly <- fit_bspline(data_poly)  # Will use n/2 = 20 knots
+fit_b_poly <- fit_bspline(data_poly)  # Default: n/2 knots
 diag_b_poly <- check_diagnostics(fit_b_poly, "B-spline (polynomial)")
 # Extract actual parameters from the fit
 b_poly_knots <- attr(fit_b_poly, "stan_data")$num_knots
@@ -279,7 +299,7 @@ plots_b_poly <- plot_spline_fit(fit_b_poly, data_poly, "B-spline",
                                 params = paste0("knots=", b_poly_knots, ", degree=", b_poly_degree, ", smoothing=", b_poly_smooth))
 
 cat("\n  [Test 2 - C-spline polynomial function] Fitting model...\n")
-fit_c_poly <- fit_cspline(data_poly)  # Will use n/4 = 10 knots
+fit_c_poly <- fit_cspline(data_poly)  # Default: n/4 knots
 diag_c_poly <- check_diagnostics(fit_c_poly, "C-spline (polynomial)")
 # Extract actual parameters from the fit
 c_poly_knots <- attr(fit_c_poly, "stan_data")$num_knots
@@ -291,7 +311,7 @@ cat("\n\nTest 3: Complex function (sin + cos)\n")
 data_complex <- generate_test_data(n = 50, func_type = "complex", noise_sd = 0.1)
 
 cat("  [Test 3 - B-spline complex function] Fitting model...\n")
-fit_b_complex <- fit_bspline(data_complex)  # Will use n/2 = 25 knots
+fit_b_complex <- fit_bspline(data_complex)  # Default: n/2 knots
 diag_b_complex <- check_diagnostics(fit_b_complex, "B-spline (complex)")
 # Extract actual parameters from the fit
 b_complex_knots <- attr(fit_b_complex, "stan_data")$num_knots
@@ -301,7 +321,7 @@ plots_b_complex <- plot_spline_fit(fit_b_complex, data_complex, "B-spline",
                                    params = paste0("knots=", b_complex_knots, ", degree=", b_complex_degree, ", smoothing=", b_complex_smooth))
 
 cat("\n  [Test 3 - C-spline complex function] Fitting model...\n")
-fit_c_complex <- fit_cspline(data_complex)  # Will use n/4 = 12.5 ≈ 12 knots
+fit_c_complex <- fit_cspline(data_complex)  # Default: n/4 knots
 diag_c_complex <- check_diagnostics(fit_c_complex, "C-spline (complex)")
 # Extract actual parameters from the fit
 c_complex_knots <- attr(fit_c_complex, "stan_data")$num_knots
@@ -317,8 +337,7 @@ if (!is.null(plots_b_sine$fit) && !is.null(plots_c_sine$fit)) {
     plot_annotation(
       title = "B-splines vs C-splines: Function Fitting Comparison",
       subtitle = paste0("Blue: fitted spline with 95% CI, Red dashed: true function, Points: data\n",
-                       "B-splines: n/2 knots with smoothing = ", b_sine_smooth, 
-                       " | C-splines: n/4 knots (no smoothing)")
+                       "B-splines: n/2 knots with smoothing = ", b_sine_smooth, ", C-splines: n/4 knots without smoothing")
     )
   
   ggsave("output/test-spline_comparison.png", main_plot, width = 10, height = 12, dpi = 300)
@@ -367,7 +386,7 @@ for (degree in c(2, 3, 4)) {
   cat(paste0("\n  [Test 5 - B-spline degree ", degree, "] Fitting model...\n"))
   tryCatch({
     fit_b_degree <- fit_bspline(data_test, num_knots = 6, spline_degree = degree, 
-                                chains = 2, iter_warmup = 300, iter_sampling = 500)
+                                chains = 4, iter_warmup = 300, iter_sampling = 500)
     diag <- check_diagnostics(fit_b_degree, paste0("B-spline (degree ", degree, ")"))
     plots <- plot_spline_fit(fit_b_degree, data_test, paste0("B-spline (degree ", degree, ")"))
     if (!is.null(plots$fit)) {
@@ -387,63 +406,43 @@ if (length(degree_plots) > 0) {
 }
 
 # Save diagnostics summary as CSV
-# Helper function to safely extract diagnostic values
-get_diag_value <- function(diag_obj, field) {
-  if (!is.null(diag_obj) && !is.null(diag_obj[[field]])) {
-    return(diag_obj[[field]])
-  } else {
-    return(NA)
-  }
-}
-
+# Create a simple summary of key diagnostics
 diagnostics_df <- data.frame(
   function_type = c("sine", "sine", "polynomial", "polynomial", "complex", "complex"),
   spline_type = rep(c("bspline", "cspline"), 3),
-  ess_bulk = c(
-    get_diag_value(diag_b_sine, "ess_bulk"),
-    get_diag_value(diag_c_sine, "ess_bulk"),
-    get_diag_value(diag_b_poly, "ess_bulk"),
-    get_diag_value(diag_c_poly, "ess_bulk"),
-    get_diag_value(diag_b_complex, "ess_bulk"),
-    get_diag_value(diag_c_complex, "ess_bulk")
-  ),
-  ess_tail = c(
-    get_diag_value(diag_b_sine, "ess_tail"),
-    get_diag_value(diag_c_sine, "ess_tail"),
-    get_diag_value(diag_b_poly, "ess_tail"),
-    get_diag_value(diag_c_poly, "ess_tail"),
-    get_diag_value(diag_b_complex, "ess_tail"),
-    get_diag_value(diag_c_complex, "ess_tail")
-  ),
-  rhat = c(
-    get_diag_value(diag_b_sine, "rhat"),
-    get_diag_value(diag_c_sine, "rhat"),
-    get_diag_value(diag_b_poly, "rhat"),
-    get_diag_value(diag_c_poly, "rhat"),
-    get_diag_value(diag_b_complex, "rhat"),
-    get_diag_value(diag_c_complex, "rhat")
+  num_knots = c(
+    b_sine_knots, c_sine_knots,
+    b_poly_knots, c_poly_knots,
+    b_complex_knots, c_complex_knots
   ),
   divergences = c(
-    get_diag_value(diag_b_sine, "divergences"),
-    get_diag_value(diag_c_sine, "divergences"),
-    get_diag_value(diag_b_poly, "divergences"),
-    get_diag_value(diag_c_poly, "divergences"),
-    get_diag_value(diag_b_complex, "divergences"),
-    get_diag_value(diag_c_complex, "divergences")
+    diag_b_sine$divergences, diag_c_sine$divergences,
+    diag_b_poly$divergences, diag_c_poly$divergences,
+    diag_b_complex$divergences, diag_c_complex$divergences
   ),
-  diagnostics_passed = c(
-    get_diag_value(diag_b_sine, "all_ok"),
-    get_diag_value(diag_c_sine, "all_ok"),
-    get_diag_value(diag_b_poly, "all_ok"),
-    get_diag_value(diag_c_poly, "all_ok"),
-    get_diag_value(diag_b_complex, "all_ok"),
-    get_diag_value(diag_c_complex, "all_ok")
+  high_rhat_params = c(
+    diag_b_sine$high_rhat, diag_c_sine$high_rhat,
+    diag_b_poly$high_rhat, diag_c_poly$high_rhat,
+    diag_b_complex$high_rhat, diag_c_complex$high_rhat
   ),
-  timestamp = rep(as.character(Sys.time()), 6),
+  low_ess_params = c(
+    diag_b_sine$low_ess, diag_c_sine$low_ess,
+    diag_b_poly$low_ess, diag_c_poly$low_ess,
+    diag_b_complex$low_ess, diag_c_complex$low_ess
+  ),
+  smoothing_strength = c(
+    b_sine_smooth, NA,  # C-splines don't have smoothing
+    b_poly_smooth, NA,
+    b_complex_smooth, NA
+  ),
   stringsAsFactors = FALSE
 )
 
-write.csv(diagnostics_df, "output/test-diagnostics_summary.csv", row.names = FALSE)
+# Print summary to console as well
+cat("\n\n=== Diagnostics Summary ===\n")
+print(diagnostics_df)
+
+# Removed CSV output - diagnostics are shown in console
 
 # Performance comparison
 cat("\n\n=== Performance comparison ===\n")
@@ -453,35 +452,23 @@ data_perf <- generate_test_data(n = 100, func_type = "complex", noise_sd = 0.1)
 
 cat("  [Performance - B-spline timing] Fitting model...\n")
 time_b <- system.time({
-  fit_b_perf <- fit_bspline(data_perf, num_knots = 8, chains = 2, 
+  fit_b_perf <- fit_bspline(data_perf, num_knots = 8, chains = 4, 
                             iter_warmup = 500, iter_sampling = 1000)
 })
 
 cat("  [Performance - C-spline timing] Fitting model...\n")
 time_c <- system.time({
-  fit_c_perf <- fit_cspline(data_perf, num_knots = 8, chains = 2, 
+  fit_c_perf <- fit_cspline(data_perf, num_knots = 8, chains = 4, 
                             iter_warmup = 500, iter_sampling = 1000)
 })
 
 cat("\nB-spline time:", time_b["elapsed"], "seconds\n")
 cat("C-spline time:", time_c["elapsed"], "seconds\n")
-
-# Save timing results
-timing_results <- data.frame(
-  method = c("B-spline", "C-spline"),
-  elapsed_time = c(time_b["elapsed"], time_c["elapsed"]),
-  n_data = 100,
-  n_knots = 8,
-  chains = 2,
-  total_iterations = 1500
-)
-
-write.csv(timing_results, "output/test-timing_results.csv", row.names = FALSE)
+cat(sprintf("Speed ratio: C-splines are %.1fx faster\n", 
+            as.numeric(time_b["elapsed"] / time_c["elapsed"])))
 
 cat("\n\n=== Testing complete ===\n")
 cat("Results saved to output/ directory:\n")
 cat("  - test-spline_comparison.png: Main comparison plots\n")
 cat("  - test-bspline_basis_functions.png: B-spline basis visualization\n")
 cat("  - test-bspline_degree_comparison.png: Effect of spline degree\n")
-cat("  - test-diagnostics_summary.csv: Full diagnostics results\n")
-cat("  - test-timing_results.csv: Performance comparison\n")

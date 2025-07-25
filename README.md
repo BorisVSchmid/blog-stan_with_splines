@@ -115,6 +115,88 @@ source("examples/run_regional_splines.R")   # Regional hierarchical models
 | **Best for** | Flexible local fitting | Smooth global curves |
 | **Extrapolation** | Not recommended | Not recommended |
 
+## When to Use B-splines vs C-splines
+
+### Choose B-splines when you need:
+
+**1. Local Control**
+- Changes to data in one region shouldn't affect the entire curve
+- Modeling data with local features, sharp peaks, or discontinuities
+- Robustness to outliers (they only affect nearby regions)
+- Example: Epidemic curves with distinct outbreak peaks
+
+**2. Flexible Degree Selection**
+- Linear (degree 1) for piecewise linear fits
+- Quadratic (degree 2) for simple smooth curves
+- Cubic (degree 3) for standard smooth modeling
+- Higher degrees for special requirements
+
+**3. Explicit Smoothing Control**
+- The `smoothing_strength` parameter provides fine control
+- 0 = no smoothing (independent coefficients)
+- 1-2 = mild smoothing (typical default)
+- 5-10 = strong smoothing
+- Scale-invariant smoothing that adapts to the y-axis standard deviation and the number of basis functions
+- Example: Adjusting smoothness based on data quality or sample size
+
+**4. Hierarchical Modeling**
+- Local basis functions work well with region-specific effects
+- Each region can have different coefficient values
+- Natural for multi-level models
+
+### Choose C-splines when you need:
+
+**1. Natural Smoothness**
+- Automatic C² continuity (smooth second derivatives)
+- Optimal in the sense of minimizing total curvature
+- Natural boundary conditions with linear extrapolation
+- Example: Long-term mortality trends or baseline hazards
+
+**2. Parsimonious Models**
+- Fewer parameters to estimate (one per knot)
+- More efficient for simple smooth curves
+- Better when you have limited data
+- Example: Age-specific patterns that change gradually
+
+**3. Global Smoothness Constraints**
+- Ensures smooth transitions across entire domain
+- No risk of artificial wiggles between knots
+- Appropriate for inherently smooth processes
+- Example: Temperature trends or growth curves
+
+### Practical Examples for Epidemiology
+
+**B-splines are ideal for:**
+```r
+# Modeling epidemic curves with potential sharp features
+epidemic_fit <- fit_bspline(outbreak_data, 
+                           num_knots = 15,        # More knots for flexibility
+                           smoothing_strength = 2)  # Control wiggliness
+
+# Regional models with local variation
+regional_model <- stan("regional_splines.stan", 
+                       data = list(spline_degree = 3,
+                                  num_knots = 10))
+```
+
+**C-splines are ideal for:**
+```r
+# Smooth baseline mortality trends
+baseline_fit <- fit_cspline(mortality_data,
+                           num_knots = 7)  # Fewer knots needed
+
+# Age-specific infection fatality rates
+age_ifr_fit <- fit_cspline(age_data,
+                          num_knots = 5)  # Smooth age progression
+```
+
+### Mixed Approaches
+
+In complex models, you might use both:
+- B-splines for the main time-varying effects (with local features)
+- C-splines for smooth confounders or baseline trends
+- Example: COVID-19 model with B-splines for daily cases and C-splines for age effects
+
 ## Shrinkage and Regularization
 
 Neither implementation includes automatic shrinkage or regularization:
@@ -229,6 +311,135 @@ source("demo_regional_splines.R")
 # Full analysis with visualizations
 source("run_regional_splines.R")
 ```
+
+## Using Splines in Your Stan Models
+
+This repository provides two ways to incorporate splines into your Stan models:
+
+### Option 1: Copy-paste the functions (Recommended for B-splines)
+
+For B-splines, you can copy the `build_b_spline` function directly into your Stan model:
+
+```stan
+functions {
+  vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
+    // Copy the function from code/bsplines.stan
+  }
+}
+
+data {
+  // Your data
+  int<lower=0> n_data;
+  array[n_data] real x;
+  vector[n_data] y;
+  
+  // Spline parameters
+  int<lower=1> num_knots;
+  int<lower=1> spline_degree;
+  real<lower=0> smoothing_strength;
+  real<lower=0> prior_scale;
+}
+
+transformed data {
+  // Set up B-spline basis (see code/bsplines.stan for full implementation)
+  int num_basis = num_knots + spline_degree - 1;
+  // ... knot placement and basis construction ...
+}
+
+parameters {
+  real alpha_0;  // Intercept
+  vector[num_basis] alpha_raw;  // Spline coefficients
+  // ... other parameters ...
+}
+
+model {
+  // Use the spline in your model
+  vector[n_data] y_hat = alpha_0 + to_vector(alpha' * B);
+  y ~ normal(y_hat, sigma);
+}
+```
+
+### Option 2: Include the spline library (Required for C-splines)
+
+For C-splines, you must include the stan-splines library:
+
+```stan
+functions {
+  #include spline.stan
+}
+
+data {
+  int<lower=0> n_data;
+  array[n_data] real x;
+  vector[n_data] y;
+  int<lower=1> num_knots;
+}
+
+transformed data {
+  // Set up knots and get spline coefficients
+  vector[num_knots] knots = // ... set knot positions ...
+  matrix[4, num_knots - 1] spline_coeffs = spline_coeff(knots, y_at_knots);
+}
+
+parameters {
+  vector[num_knots] y_at_knots;  // Values at knot positions
+  // ... other parameters ...
+}
+
+model {
+  // Evaluate spline at data points
+  vector[n_data] y_hat;
+  for (i in 1:n_data) {
+    y_hat[i] = spline_eval(x[i], knots, spline_coeffs);
+  }
+  y ~ normal(y_hat, sigma);
+}
+```
+
+### Key Implementation Details
+
+#### B-splines
+1. **Knot placement**: Place knots at quantiles of your x data
+2. **Extended knots**: Repeat boundary knots `spline_degree` times
+3. **Basis construction**: Use `build_b_spline` to create basis matrix
+4. **Smoothing**: Apply random walk prior with `tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis)`
+
+#### C-splines
+1. **Include directive**: Must have `spline.stan` file in same directory or in include path
+2. **Knot coverage**: Ensure knots cover full data range
+3. **Functions**: Use `spline_coeff()` once, then `spline_eval()` for each point
+4. **Natural boundaries**: Automatic linear extrapolation at endpoints
+
+### Minimal Working Examples
+
+See these files for complete, working implementations:
+- **B-splines**: `code/bsplines.stan` - Full implementation with smoothing
+- **C-splines**: `code/csplines.stan` - Natural cubic splines with stan-splines library
+- **Regional models**: `examples/regional_splines.stan` - Hierarchical splines for multiple regions
+
+### Common Pitfalls
+
+1. **Array syntax**: Use modern Stan array syntax (`array[N] real x` not `real x[N]`)
+2. **Knot coverage**: Ensure knots span your data range (especially for C-splines)
+3. **Include paths**: Place `spline.stan` where Stan can find it
+4. **Boundary behavior**: Both spline types can extrapolate poorly - keep predictions within data range
+
+### Choosing Spline Parameters
+
+**Number of knots**:
+- B-splines: Start with `n/2` (where n is number of data points)
+- C-splines: Start with `n/4` (they need fewer knots)
+- Adjust based on complexity of your function
+
+**Smoothing (B-splines only)**:
+- `smoothing_strength = 0`: No smoothing (independent coefficients)
+- `smoothing_strength = 1-2`: Mild smoothing (recommended default)
+- `smoothing_strength = 5-10`: Strong smoothing
+- The parameter automatically scales with data variance and number of basis functions
+
+**Prior scale**:
+- Set to `2 * sd(y)` for automatic scaling
+- Adjusts coefficient priors to match your data scale
 
 ## Future Enhancements
 

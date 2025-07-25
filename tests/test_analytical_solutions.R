@@ -42,7 +42,8 @@ test_cubic_polynomial <- function() {
   cat("  [Test 1 - C-spline cubic polynomial fitting] Fitting model...\n")
   fit <- model$sample(
     data = stan_data,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 300,
     iter_sampling = 600,
     refresh = 0
@@ -96,7 +97,8 @@ test_constant_function <- function() {
   cat("  [Test 2 - B-spline constant function fitting] Fitting model...\n")
   fit_b <- model_b$sample(
     data = stan_data_b,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 500,
     iter_sampling = 600,
     refresh = 0,
@@ -127,7 +129,8 @@ test_constant_function <- function() {
   cat("  [Test 2 - C-spline constant function fitting] Fitting model...\n")
   fit_c <- model_c$sample(
     data = stan_data_c,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 400,
     refresh = 0,
@@ -194,7 +197,8 @@ test_step_function <- function() {
   model <- cmdstan_model("code/csplines.stan")
   fit <- model$sample(
     data = stan_data,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 200,
     iter_sampling = 400,
     refresh = 0
@@ -252,14 +256,15 @@ test_sine_wave <- function() {
     y = y,
     num_knots = 12,  # Need enough knots for oscillating function
     spline_degree = 3,
-    smoothing_strength = 1,  # Mild smoothing for sine wave
+    smoothing_strength = 2,  # Mild smoothing for sine wave
     prior_scale = 2
   )
   
   model_b <- cmdstan_model("code/bsplines.stan")
   fit_b <- model_b$sample(
     data = stan_data_b,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 500,
     iter_sampling = 700,
     refresh = 0,
@@ -286,7 +291,8 @@ test_sine_wave <- function() {
   model_c <- cmdstan_model("code/csplines.stan")
   fit_c <- model_c$sample(
     data = stan_data_c,
-    chains = 1,
+    chains = 4,
+    parallel_chains = 4,
     iter_warmup = 500,
     iter_sampling = 700,
     refresh = 0,

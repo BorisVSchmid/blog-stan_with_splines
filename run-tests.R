@@ -15,10 +15,9 @@ all_test_files <- list.files("tests", pattern = "^test_.*\\.R$", full.names = TR
 test_order <- c(
   "test_basic_splines.R",
   "test_3_knots.R",
-  "test_smoothing_strength.R",
+  "test_smoothing_comparison.R",
   "test_numerical_accuracy.R",
   "test_analytical_solutions.R",
-  "test_edf_knot_response.R",
   "test_diagnostics_both_splines.R",
   "test_splines.R",
   "test_regional_splines.R"
@@ -39,9 +38,10 @@ for (test in test_order) {
 remaining_tests <- setdiff(all_test_files, ordered_tests)
 all_tests <- c(ordered_tests, remaining_tests)
 
-# Debug: Ensure we have all 9 tests
-if (length(all_tests) != 9) {
-  cat("WARNING: Expected 9 tests but found", length(all_tests), "\n")
+# Debug: Check test count
+expected_tests <- 8  # Updated count after removing tests
+if (length(all_tests) != expected_tests) {
+  cat("WARNING: Expected", expected_tests, "tests but found", length(all_tests), "\n")
   cat("Missing tests might include:", paste(setdiff(test_order, basename(all_tests)), collapse = ", "), "\n")
 }
 
@@ -52,10 +52,9 @@ cat("Test files:", paste(basename(all_tests), collapse = ", "), "\n\n")
 test_descriptions <- list(
   "test_basic_splines.R" = "Basic functionality of B-splines and C-splines",
   "test_3_knots.R" = "Minimal spline fitting with only 3 knots",
-  "test_smoothing_strength.R" = "Smoothing strength parameter effects",
+  "test_smoothing_comparison.R" = "B-splines vs C-splines smoothing approaches on complex function",
   "test_numerical_accuracy.R" = "Numerical properties (partition of unity, monotonicity)",
   "test_analytical_solutions.R" = "Known analytical solutions (polynomials, constants, sine)",
-  "test_edf_knot_response.R" = "Effective degrees of freedom and knot placement",
   "test_diagnostics_both_splines.R" = "Diagnostic comparison between B-splines and C-splines",
   "test_splines.R" = "Comprehensive spline fitting across multiple scenarios",
   "test_regional_splines.R" = "Regional hierarchical splines with comprehensive analysis"
@@ -273,7 +272,7 @@ cat("\n\nTest Categories:\n")
 cat(rep("-", 140), "\n", sep = "")
 cat("Core functionality:  test_basic_splines.R, test_3_knots.R\n")
 cat("Mathematical tests:  test_numerical_accuracy.R, test_analytical_solutions.R\n")
-cat("Parameter tests:     test_smoothing_strength.R, test_edf_knot_response.R\n")
+cat("Parameter tests:     test_smoothing_comparison.R\n")
 cat("Diagnostic tests:    test_diagnostics_both_splines.R\n")
 cat("Advanced tests:      test_splines.R, test_regional_splines*.R\n")
 
