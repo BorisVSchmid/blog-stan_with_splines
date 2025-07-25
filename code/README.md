@@ -2,6 +2,8 @@
 
 This directory contains the core Stan models and R functions for B-splines and C-splines.
 
+For detailed differences between our implementations and the original sources, see [IMPLEMENTATION_DIFFERENCES.md](IMPLEMENTATION_DIFFERENCES.md).
+
 ## Stan Models
 
 ### bsplines.stan

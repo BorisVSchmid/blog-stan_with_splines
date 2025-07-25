@@ -56,7 +56,7 @@ transformed data {
   if (smoothing_strength == 0) {
     tau_smooth = 0;  // Special case: independent coefficients
   } else {
-    tau_smooth = 1 / sqrt(smoothing_strength);  // Convert to SD scale
+    tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis);  // Scale by data variance and number of basis functions
   }
   
   // Set up knots

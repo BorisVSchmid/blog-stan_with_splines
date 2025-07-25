@@ -201,7 +201,8 @@ for (i in 1:num_basis) {
 }
 
 # Compute recovered global pattern
-recovered_global <- as.numeric(mu_alpha_mean %*% B_plot) + mu_beta
+# mu_alpha is a row vector, so we need to ensure proper dimensions
+recovered_global <- as.numeric(matrix(mu_alpha_mean, nrow = 1) %*% B_plot) + mu_beta
 
 # Extract regional deviations
 # For each region: (alpha[r] - mu_alpha) * B + (beta[r] - mu_beta)
@@ -211,7 +212,7 @@ for (r in 1:3) {
   alpha_r_mean <- colMeans(draws[, alpha_cols])
   beta_r <- mean(draws[, paste0("beta_region[", r, "]")])
   
-  deviation <- as.numeric((alpha_r_mean - mu_alpha_mean) %*% B_plot) + (beta_r - mu_beta)
+  deviation <- as.numeric(matrix(alpha_r_mean - mu_alpha_mean, nrow = 1) %*% B_plot) + (beta_r - mu_beta)
   regional_deviations[[r]] <- deviation
 }
 

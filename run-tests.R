@@ -14,11 +14,11 @@ all_test_files <- list.files("tests", pattern = "^test_.*\\.R$", full.names = TR
 # Order tests by complexity/speed (fast tests first)
 test_order <- c(
   "test_basic_splines.R",
-  "test_3_knots.R",
-  "test_smoothing_comparison.R",
+  "test_edge_cases_minimal_knots.R",
+  "test_flexibility_comparison_bspline_vs_cspline.R",
   "test_numerical_accuracy.R",
   "test_analytical_solutions.R",
-  "test_diagnostics_both_splines.R",
+  "test_diagnostics_comparison.R",
   "test_splines.R",
   "test_regional_splines.R"
 )
@@ -51,11 +51,11 @@ cat("Test files:", paste(basename(all_tests), collapse = ", "), "\n\n")
 # Define test descriptions
 test_descriptions <- list(
   "test_basic_splines.R" = "Basic functionality of B-splines and C-splines",
-  "test_3_knots.R" = "Minimal spline fitting with only 3 knots",
-  "test_smoothing_comparison.R" = "B-splines vs C-splines smoothing approaches on complex function",
+  "test_edge_cases_minimal_knots.R" = "Edge cases with minimal knots (2-3 knots) for both spline types",
+  "test_flexibility_comparison_bspline_vs_cspline.R" = "B-splines vs C-splines smoothing approaches on complex function",
   "test_numerical_accuracy.R" = "Numerical properties (partition of unity, monotonicity)",
   "test_analytical_solutions.R" = "Known analytical solutions (polynomials, constants, sine)",
-  "test_diagnostics_both_splines.R" = "Diagnostic comparison between B-splines and C-splines",
+  "test_diagnostics_comparison.R" = "Diagnostic comparison between B-splines and C-splines",
   "test_splines.R" = "Comprehensive spline fitting across multiple scenarios",
   "test_regional_splines.R" = "Regional hierarchical splines with comprehensive analysis"
 )

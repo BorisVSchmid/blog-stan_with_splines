@@ -52,7 +52,7 @@ generate_test_data <- function(n = 50, func_type = "sine", noise_sd = 0.1) {
 # 
 # Instead, we use simple rules based on sample size:
 # - B-splines: n/2 knots (with smoothing prior to handle flexibility)
-# - C-splines: n/4 knots (global support requires fewer knots)
+# - C-splines: n/2 knots (consistent formula for simplicity)
 # 
 # The smoothing prior in B-splines is scale-invariant in x-space because it operates
 # on adjacent coefficients (knot-to-knot), not on the x-scale directly.
@@ -107,8 +107,8 @@ fit_cspline <- function(data, num_knots = NULL,
   # Simple knot selection based on sample size
   if (is.null(num_knots)) {
     n <- length(data$x)
-    # C-splines with global support need fewer knots
-    num_knots <- max(4, min(round(n/4), 30))
+    # Use same formula as B-splines for consistency
+    num_knots <- max(4, min(round(n/2), 40))
   }
   
   stan_data <- list(

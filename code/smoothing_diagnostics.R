@@ -169,23 +169,57 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   # Special case: model misspecification
   if (high_edf && high_autocor) {
     suggestions <- c(suggestions,
-      "Possible solutions for model misspecification:"
+      "Possible model misspecification:"
     )
     
     if (model_type == "bspline" && diagnosis$has_bspline_params) {
-      suggestions <- c(suggestions,
-        sprintf("  - Try increasing smoothing_strength (current: %.1f) for smoother fit", 
-                ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)),
-        sprintf("  - OR increase num_knots (current: %d) to capture more complexity", 
-                diagnosis$num_knots)
-      )
+      # Check if we already have many knots relative to data
+      if (diagnosis$num_basis >= n * 0.4) {
+        # Many basis functions but still poor fit - smoothing is likely the issue
+        if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 4) {
+          suggestions <- c(suggestions,
+            sprintf("  - Try reducing smoothing_strength (current: %.1f) to allow more flexibility", 
+                    diagnosis$smoothing_strength),
+            "  - Consider smoothing_strength = 2-4 for mild smoothing",
+            "  - Check for outliers or structural breaks in the data"
+          )
+        } else if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
+          suggestions <- c(suggestions,
+            sprintf("  - Smoothing is already mild (%.1f), try setting to 0 for no smoothing", 
+                    diagnosis$smoothing_strength),
+            "  - Check for outliers or structural breaks in the data",
+            "  - The data may have features that smooth splines cannot capture"
+          )
+        } else {
+          suggestions <- c(suggestions,
+            sprintf("  - With %d basis functions and no smoothing, check data quality", diagnosis$num_basis),
+            "  - Look for outliers, measurement errors, or model misspecification",
+            "  - The data may have features that splines cannot capture well"
+          )
+        }
+      } else {
+        suggestions <- c(suggestions,
+          sprintf("  - Try reducing smoothing_strength (current: %.1f) for more flexibility", 
+                  ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)),
+          sprintf("  - OR increase num_knots (current: %d) if function is very complex", 
+                  diagnosis$num_knots)
+        )
+      }
     } else {
       # C-spline only has knot control
-      suggestions <- c(suggestions,
-        sprintf("  - Try reducing num_knots (current: %d) for smoother fit", 
-                diagnosis$num_knots),
-        "  - OR increase num_knots to capture more complexity"
-      )
+      # Check if already have very few knots
+      if (diagnosis$num_knots <= 5) {
+        suggestions <- c(suggestions,
+          sprintf("  - With only %d knots, the model may be too inflexible", diagnosis$num_knots),
+          "  - Consider increasing num_knots to capture the data complexity",
+          "  - OR consider B-splines which offer smoothing control"
+        )
+      } else {
+        suggestions <- c(suggestions,
+          sprintf("  - Try adjusting num_knots (current: %d)", diagnosis$num_knots),
+          "  - Fewer knots for smoother fit, more knots for flexibility"
+        )
+      }
     }
   } else if (over_smoothed) {
     suggestions <- c(suggestions,
@@ -193,43 +227,71 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
     )
     
     if (model_type == "bspline" && diagnosis$has_bspline_params) {
-      # B-spline specific recommendations - reduce smoothing or add knots
-      min_knots <- max(4, min(round(n/4), 40))
+      # B-spline specific recommendations
       
-      if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 5) {
-        suggested_strength <- max(2, diagnosis$smoothing_strength / 2)
-        suggestions <- c(suggestions,
-          sprintf("  - Reduce smoothing_strength to %.0f (current: %.1f)",
-                  suggested_strength, diagnosis$smoothing_strength)
-        )
-      } else if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
-        suggestions <- c(suggestions,
-          sprintf("  - Reduce smoothing_strength (current: %.1f) or set to 0 for no smoothing",
-                  diagnosis$smoothing_strength)
-        )
-      }
-      
-      if (diagnosis$num_knots < min_knots) {
-        suggestions <- c(suggestions,
-          sprintf("  - Increase num_knots to %d (current: %d) for more flexibility", 
-                  min_knots, diagnosis$num_knots)
-        )
+      # Check if we already have many knots
+      if (diagnosis$num_basis >= n * 0.4) {
+        # Already have lots of basis functions
+        if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
+          # Calculate suggested smoothing based on current value
+          suggested_smooth <- max(0, diagnosis$smoothing_strength / 2)
+          suggestions <- c(suggestions,
+            sprintf("  - Reduce smoothing_strength to %.1f (current: %.1f)",
+                    suggested_smooth, diagnosis$smoothing_strength),
+            "  - OR set smoothing_strength = 0 for no smoothing"
+          )
+        } else {
+          suggestions <- c(suggestions,
+            "  - Already using no smoothing with many basis functions",
+            "  - Over-smoothing diagnosis may be incorrect",
+            "  - Check if residual patterns are due to data issues"
+          )
+        }
+      } else {
+        # Can potentially add more knots
+        min_knots <- max(4, min(round(n/2), 40))
+        
+        if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 5) {
+          suggested_strength <- max(2, diagnosis$smoothing_strength / 2)
+          suggestions <- c(suggestions,
+            sprintf("  - Reduce smoothing_strength to %.0f (current: %.1f)",
+                    suggested_strength, diagnosis$smoothing_strength)
+          )
+        } else if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
+          suggestions <- c(suggestions,
+            sprintf("  - Reduce smoothing_strength (current: %.1f) or set to 0 for no smoothing",
+                    diagnosis$smoothing_strength)
+          )
+        }
+        
+        if (diagnosis$num_knots < min_knots) {
+          suggestions <- c(suggestions,
+            sprintf("  - Increase num_knots to %d (current: %d) for more flexibility", 
+                    min_knots, diagnosis$num_knots)
+          )
+        }
       }
     } else {
       # C-spline or other spline types - only knot-based control
-      suggestions <- c(suggestions,
-        sprintf("  1. In R script: Add more knots - increase num_knots (current %d with EDF %.1f needs more flexibility)", 
-                diagnosis$num_knots, edf)
-      )
+      if (diagnosis$num_knots <= 5) {
+        suggestions <- c(suggestions,
+          sprintf("  - With only %d knots, increasing knots is the main option", diagnosis$num_knots),
+          sprintf("  - Try num_knots = %d for more flexibility", min(10, round(n/4)))
+        )
+      } else {
+        suggestions <- c(suggestions,
+          sprintf("  - Add more knots - increase num_knots (current: %d)", diagnosis$num_knots)
+        )
+      }
       
       if (model_type == "cspline") {
         suggestions <- c(suggestions,
-          "  2. C-splines have limited smoothing control - consider B-splines for more options"
+          "  - C-splines have limited smoothing control - consider B-splines for finer control"
         )
       }
       
       suggestions <- c(suggestions,
-        "  3. Check if your data has sufficient variation to support the fitted curve"
+        "  - Check if your data has sufficient variation to support the fitted curve"
       )
     }
   }
@@ -245,29 +307,42 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       if (edf_severity > 0.5 || too_many_basis) {
         # Severe overfitting - strong measures needed
         # Calculate reasonable knot range
-        min_knots <- max(4, min(round(n/4), 40))
+        min_knots <- max(4, min(round(n/2), 40))
         suggested_knots <- max(min_knots, round(diagnosis$num_knots * 0.75))
         
         if (too_many_basis) {
+          # Suggest specific smoothing values based on current setting
+          current_smooth <- ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)
+          if (current_smooth < 2) {
+            suggested_smooth <- 4
+          } else if (current_smooth < 5) {
+            suggested_smooth = current_smooth * 2
+          } else {
+            suggested_smooth = current_smooth + 5
+          }
+          
           suggestions <- c(suggestions,
-            sprintf("  - Try increasing smoothing_strength (current: %.1f) for smoother fit", 
-                    ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)),
-            sprintf("  - OR reduce num_knots to %d (%d basis functions for %d data points is generous)", 
+            sprintf("  - Increase smoothing_strength to %.0f (current: %.1f) for smoother fit", 
+                    suggested_smooth, current_smooth),
+            sprintf("  - OR reduce num_knots to %d (currently %d basis functions for %d data points)", 
                     suggested_knots, diagnosis$num_basis, n)
           )
         } else {
+          current_smooth <- ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)
+          suggested_smooth <- ifelse(current_smooth < 2, 2, current_smooth * 1.5)
+          
           suggestions <- c(suggestions,
-            sprintf("  - Try increasing smoothing_strength (current: %.1f) for smoother fit", 
-                    ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)),
-            sprintf("  - OR reduce num_knots moderately (current: %d)", 
-                    diagnosis$num_knots)
+            sprintf("  - Try smoothing_strength = %.0f (current: %.1f) for smoother fit", 
+                    suggested_smooth, current_smooth),
+            sprintf("  - OR reduce num_knots to %d (current: %d)", 
+                    suggested_knots, diagnosis$num_knots)
           )
         }
         
         # Remove prior_scale recommendations entirely
       } else {
         # Mild overfitting - gentler approach
-        min_knots <- max(4, min(round(n/4), 40))
+        min_knots <- max(4, min(round(n/2), 40))
         suggested_knots <- max(min_knots, round(diagnosis$num_knots * 0.85))
         
         suggestions <- c(suggestions,
@@ -278,9 +353,16 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       }
     } else {
       # C-spline or other spline types - only knot-based control
-      if (edf_severity > 0.5 || too_many_basis) {
-        # Severe overfitting
-        min_knots <- max(3, min(round(n/6), 20))  # C-splines can use fewer knots
+      if (diagnosis$num_knots <= 5) {
+        # Very few knots - can't reduce further
+        suggestions <- c(suggestions,
+          sprintf("  - With only %d knots, overfitting is unlikely", diagnosis$num_knots),
+          "  - The wiggliness may be inherent to natural cubic splines",
+          "  - Consider B-splines for better smoothing control"
+        )
+      } else if (edf_severity > 0.5 || too_many_basis) {
+        # Severe overfitting with many knots
+        min_knots <- max(4, min(round(n/2), 40))  # Use consistent formula
         suggested_knots <- max(min_knots, round(diagnosis$num_knots * 0.7))
         
         suggestions <- c(suggestions,
@@ -291,7 +373,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
         )
       } else {
         # Mild overfitting
-        min_knots <- max(3, min(round(n/6), 20))
+        min_knots <- max(4, min(round(n/2), 40))
         suggested_knots <- max(min_knots, round(diagnosis$num_knots * 0.85))
         
         suggestions <- c(suggestions,

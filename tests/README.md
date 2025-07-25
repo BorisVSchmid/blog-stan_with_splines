@@ -16,24 +16,29 @@ cd tests
 Rscript test_basic_splines.R
 ```
 
-## Test Files (9 total)
+## Test Files (8 total)
 
 ### Core Functionality Tests (2)
 1. **test_basic_splines.R** - Essential functionality for both B-splines and C-splines
-2. **test_3_knots.R** - Edge case testing with minimal knot configuration
+2. **test_edge_cases_minimal_knots.R** - Edge case testing with minimal knot configurations
+   - Tests both B-splines and C-splines with 2 and 3 knots
+   - Verifies error handling for insufficient knots
+   - Shows limitations of minimal flexibility
 
 ### Mathematical Property Tests (2)
 3. **test_numerical_accuracy.R** - Verifies mathematical properties (partition of unity, monotonicity)
 4. **test_analytical_solutions.R** - Tests against known analytical solutions (polynomials, constants, sine)
 
-### Parameter and Feature Tests (3)
-5. **test_smoothing_strength.R** - Tests the smoothing_strength parameter behavior
-6. **test_edf_knot_response.R** - Tests effective degrees of freedom and knot placement
-7. **test_diagnostics_both_splines.R** - Diagnostic comparison between B-splines and C-splines
+### Parameter and Comparison Tests (2)
+5. **test_flexibility_comparison_bspline_vs_cspline.R** - Compares B-spline smoothing vs C-spline knot control
+   - B-splines: Fixed knots (n/2), varying smoothing_strength (1, 2, 4, 8, 15)
+   - C-splines: Varying number of knots (13, 11, 9, 7, 5)
+   - Shows how both approaches achieve similar flexibility through different mechanisms
+6. **test_diagnostics_comparison.R** - Diagnostic comparison between B-splines and C-splines
 
 ### Advanced Tests (2)
-8. **test_splines.R** - Comprehensive spline fitting across multiple scenarios
-9. **test_regional_splines.R** - Regional hierarchical splines with comprehensive analysis
+7. **test_splines.R** - Comprehensive spline fitting across multiple scenarios
+8. **test_regional_splines.R** - Regional hierarchical splines with comprehensive analysis
 
 ## Test Categories
 
@@ -70,7 +75,7 @@ Successful test runs will show:
 - Pass/fail status for each test  
 - Timing information
 - MCMC diagnostic summaries after each model fit
-- Detailed results table with all 9 tests
+- Detailed results table with all 8 tests
 - Summary statistics
 
 ### MCMC Diagnostics
@@ -117,8 +122,8 @@ $num_divergent
 TEST SUITE SUMMARY
 ======================================================================
 
-Total tests run: 9
-Passed: 9
+Total tests run: 8
+Passed: 8
 Failed: 0
 Total time: 352.5 seconds (5.9 minutes)
 ```
