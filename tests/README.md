@@ -76,9 +76,6 @@ Tests use the main implementations:
 - `code/csplines.stan` - Natural cubic spline implementation
 - `code/smoothing_diagnostics.R` - Diagnostic functions
 
-The only Stan file in the tests directory is:
-- `test_regional_splines.stan` - Hierarchical spline model for testing
-
 ## Expected Output
 
 Successful test runs will show:
@@ -95,12 +92,10 @@ Successful test runs will show:
 All tests now generate visualization plots saved to the `output/` directory:
 
 1. **Basic functionality**: `test-basic_spline_comparison.png`
-2. **Edge cases**: `test-edge_cases_2knots_bspline.png`, `test-edge_cases_3knots_comparison.png`
+2. **Edge cases**: `test-edge_cases_minimal_knots.png`
 3. **Numerical accuracy**: `test-numerical_accuracy_properties.png`
-4. **Flexibility comparison**: `test-flexibility_comparison.png`, `test-flexibility_comparison_summary.png`
-5. **Diagnostic recommendations**: `test-diagnostic_recommendations_scenarios.png`, `test-diagnostic_metrics_comparison.png`
-6. **Various target functions**: `test-spline_comparison.png`, `test-diagnostics_summary.csv`
-7. **Regional splines**: Multiple plots showing variance components and regional fits
+4. **Analytical solutions**: `test-spline_comparison.png`
+5. **Sine wave smoothing**: `test-sine_wave_smoothing.png`
 
 ### MCMC Diagnostics
 All test files now output MCMC diagnostic summaries after model fitting, showing:
@@ -127,7 +122,7 @@ All models are now configured to run 4 chains in parallel for better sampling an
 
 Example output:
 ```
-[1/8] Running test_basic_splines.R
+[1/5] Running test_basic_splines.R
 Purpose: Basic functionality of B-splines and C-splines
 ----------------------------------------------------------------------
 Testing B-spline model...
@@ -146,8 +141,8 @@ $num_divergent
 TEST SUITE SUMMARY
 ======================================================================
 
-Total tests run: 8
-Passed: 8
+Total tests run: 5
+Passed: 5
 Failed: 0
 Total time: 352.5 seconds (5.9 minutes)
 ```
