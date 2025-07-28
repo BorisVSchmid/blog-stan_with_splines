@@ -15,12 +15,9 @@ all_test_files <- list.files("tests", pattern = "^test_.*\\.R$", full.names = TR
 test_order <- c(
   "test_basic_splines.R",
   "test_edge_cases_minimal_knots.R",
-  "test_flexibility_bspline_vs_cspline.R",
   "test_numerical_accuracy.R",
   "test_analytical_solutions.R",
-  "test_diagnostic_recommendations.R",
-  "test_various_target_functions.R",
-  "test_regional_splines.R"
+  "test_sine_wave_smoothing.R"
 )
 
 # Reorder based on preferred order if files exist
@@ -39,7 +36,7 @@ remaining_tests <- setdiff(all_test_files, ordered_tests)
 all_tests <- c(ordered_tests, remaining_tests)
 
 # Debug: Check test count
-expected_tests <- 8  # Updated count after removing tests
+expected_tests <- 5  # Current number of tests
 if (length(all_tests) != expected_tests) {
   cat("WARNING: Expected", expected_tests, "tests but found", length(all_tests), "\n")
   cat("Missing tests might include:", paste(setdiff(test_order, basename(all_tests)), collapse = ", "), "\n")
@@ -52,12 +49,9 @@ cat("Test files:", paste(basename(all_tests), collapse = ", "), "\n\n")
 test_descriptions <- list(
   "test_basic_splines.R" = "Basic functionality of B-splines and C-splines",
   "test_edge_cases_minimal_knots.R" = "Edge cases with minimal knots (2-3 knots) for both spline types",
-  "test_flexibility_bspline_vs_cspline.R" = "B-splines vs C-splines smoothing approaches on complex function",
   "test_numerical_accuracy.R" = "Numerical properties (partition of unity, monotonicity)",
   "test_analytical_solutions.R" = "Known analytical solutions (polynomials, constants, sine)",
-  "test_diagnostic_recommendations.R" = "Diagnostic recommendations for over/under-smoothing",
-  "test_various_target_functions.R" = "Six different target functions with both spline types",
-  "test_regional_splines.R" = "Regional hierarchical splines with comprehensive analysis"
+  "test_sine_wave_smoothing.R" = "B-spline smoothing effects on sine waves with varying parameters"
 )
 
 # Track results
@@ -272,9 +266,7 @@ cat("\n\nTest Categories:\n")
 cat(rep("-", 140), "\n", sep = "")
 cat("Core functionality:  test_basic_splines.R, test_edge_cases_minimal_knots.R\n")
 cat("Mathematical tests:  test_numerical_accuracy.R, test_analytical_solutions.R\n")
-cat("Parameter tests:     test_flexibility_bspline_vs_cspline.R\n")
-cat("Diagnostic tests:    test_diagnostic_recommendations.R\n")
-cat("Advanced tests:      test_various_target_functions.R, test_regional_splines.R\n")
+cat("Parameter tests:     test_sine_wave_smoothing.R\n")
 
 # Final status
 cat("\n", rep("=", 60), "\n", sep = "")

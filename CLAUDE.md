@@ -35,7 +35,7 @@ source("run-code.R")
 # Run extended examples (complex analyses, comparisons)
 source("run-examples.R")
 
-# Run complete test suite (all 8 tests)
+# Run complete test suite (all 5 tests)
 source("run-tests.R")
 ```
 
@@ -75,6 +75,8 @@ The project provides two independent spline implementations in Stan:
    - Knots placed at quantiles with extended boundary knots
    - Number of basis functions = `num_knots + spline_degree - 1`
    - Includes `smoothing_strength` parameter for scale-invariant smoothing
+   - Smoothing formula: `tau = prior_scale / (smoothing_strength * num_basis^sqrt(2))`
+   - Default smoothing_strength = 0.1 (mild smoothing)
 
 2. **C-splines** (`code/csplines.stan`)
    - Depends on `spline.stan` library via `#include`
@@ -87,6 +89,14 @@ The project provides two independent spline implementations in Stan:
 - **B-splines**: Local support means coefficients (`alpha`) directly multiply basis functions
 - **C-splines**: Global support with values specified at knots (`y_at_knots`), then transformed to coefficients
 
+### Default Knot Selection
+
+The project uses adaptive knot selection as defaults:
+- **B-splines**: `max(4, min(round(n/2), 40))` - half the data points, capped at 40
+- **C-splines**: `max(4, min(round(n/4), 20))` - quarter of data points, capped at 20
+
+These defaults balance flexibility with stability across different sample sizes.
+
 ### MCMC Configuration
 
 All models now run with:
@@ -96,15 +106,12 @@ All models now run with:
 
 ### Testing Framework
 
-The test suite (`run-tests.R`) includes 8 tests in order of complexity:
+The test suite (`run-tests.R`) includes 5 tests in order of complexity:
 1. `test_basic_splines.R` - Basic functionality check
 2. `test_edge_cases_minimal_knots.R` - Minimal knot configuration (2-3 knots)
-3. `test_flexibility_bspline_vs_cspline.R` - Smoothing parameter effects
-4. `test_numerical_accuracy.R` - Mathematical properties
-5. `test_analytical_solutions.R` - Known function fitting
-6. `test_diagnostic_recommendations.R` - Diagnostic system testing
-7. `test_various_target_functions.R` - Comprehensive scenarios (6 functions)
-8. `test_regional_splines.R` - Hierarchical models
+3. `test_numerical_accuracy.R` - Mathematical properties
+4. `test_analytical_solutions.R` - Known function fitting
+5. `test_sine_wave_smoothing.R` - B-spline smoothing effects on sine waves
 
 ## Critical Stan Requirements
 
@@ -133,6 +140,22 @@ Managed via groundhog with date "2025-06-01":
 - cmdstanr (v0.9.0+) - installed from Stan repo
 - Core packages: posterior, dplyr, tidyr, ggplot2, patchwork
 - Namespace conflicts resolved via conflicted library
+
+## Smoothing Parameter Guide
+
+### B-spline Smoothing Strength
+- **0**: No smoothing (independent coefficients)
+- **0.05-0.1**: Mild smoothing (0.1 is default)
+- **0.1-0.2**: Strong smoothing
+
+The smoothing uses the formula `tau = prior_scale / (smoothing_strength * num_basis^sqrt(2))`, which provides:
+- Scale invariance: consistent behavior regardless of y-axis scale
+- Knot-count invariance: consistent smoothing across different numbers of basis functions
+
+### Recent Updates (2025)
+- Changed smoothing formula from `sqrt(num_basis)` to `num_basis^sqrt(2)` for better scaling
+- Updated default smoothing_strength from 1.0 to 0.1
+- Adjusted recommended ranges to reflect the new scaling
 
 ## Important Constraints
 

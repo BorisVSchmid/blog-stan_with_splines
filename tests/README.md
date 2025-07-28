@@ -16,7 +16,7 @@ cd tests
 Rscript test_basic_splines.R
 ```
 
-## Test Files (8 total)
+## Test Files (5 total)
 
 ### Core Functionality Tests (2)
 1. **test_basic_splines.R** - Essential functionality for both B-splines and C-splines
@@ -44,31 +44,13 @@ Rscript test_basic_splines.R
    - Sine functions
    - Tests both spline types against each function
 
-### Parameter and Comparison Tests (2)
-5. **test_flexibility_bspline_vs_cspline.R** - Compares smoothing approaches
-   - B-splines: Fixed knots (n/2), varying smoothing_strength (0, 2, 4, 6, 8)
-   - C-splines: Varying number of knots (13, 11, 9, 7, 5)
-   - Shows how both approaches achieve similar flexibility through different mechanisms
-   - Outputs: `test-flexibility_comparison.png`, `test-flexibility_comparison_summary.png`
-
-6. **test_diagnostic_recommendations.R** - Tests diagnostic system
-   - Four scenarios: B-spline normal, C-spline normal, B-spline overfitting, C-spline over-smoothing
-   - Verifies diagnostic metrics detect problems correctly
-   - Shows how recommendations adapt to context
-   - Outputs: `test-diagnostic_recommendations_scenarios.png`, `test-diagnostic_metrics_comparison.png`
-
-### Advanced Tests (2)
-7. **test_various_target_functions.R** - Tests six different target functions
-   - Sine, polynomial (degree 3), step function, exponential, complex (sin + cos), linear
-   - Both B-splines and C-splines fitted to each function
-   - Creates comprehensive comparison plots
-   - Outputs: `test-spline_comparison.png`, `test-diagnostics_summary.csv`
-
-8. **test_regional_splines.R** - Regional hierarchical splines
-   - Tests hierarchical model with region-specific spline coefficients
-   - Variance component analysis
-   - Comprehensive visualization of results
-   - Uses custom Stan model: `test_regional_splines.stan`
+### Parameter Test (1)
+5. **test_sine_wave_smoothing.R** - B-spline smoothing effects on sine waves
+   - Tests different smoothing values (0, 0.05, 0.10, 0.15, 0.20)
+   - Shows how smoothing affects oscillatory function fitting
+   - Compares with C-splines at different knot counts
+   - Creates 5x4 grid visualization
+   - Outputs: `test-sine_wave_smoothing.png`
 
 ## Test Categories
 
@@ -105,7 +87,7 @@ Successful test runs will show:
 - Pass/fail status for each test  
 - Timing information
 - MCMC diagnostic summaries after each model fit
-- Detailed results table with all 8 tests
+- Detailed results table with all 5 tests
 - Summary statistics
 
 ### Generated Plots

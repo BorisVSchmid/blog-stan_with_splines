@@ -39,7 +39,7 @@ stan_data_b <- list(
   y = y,
   num_knots = bspline_knots,
   spline_degree = 3,
-  smoothing_strength = 1.0, # Good default for sine waves with adaptive knots
+  smoothing_strength = 0.1, # Default mild smoothing with new formula
   prior_scale = 2 * sd(y)
 )
 

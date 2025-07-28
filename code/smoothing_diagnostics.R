@@ -180,11 +180,11 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       # Check if we already have many knots relative to data
       if (diagnosis$num_basis >= n * 0.4) {
         # Many basis functions but still poor fit - smoothing is likely the issue
-        if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 4) {
+        if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0.5) {
           suggestions <- c(suggestions,
             sprintf("  - Try reducing smoothing_strength (current: %.1f) to allow more flexibility", 
                     diagnosis$smoothing_strength),
-            "  - Consider smoothing_strength = 2-4 for mild smoothing",
+            "  - Consider smoothing_strength = 0.05-0.1 for mild smoothing",
             "  - Check for outliers or structural breaks in the data"
           )
         } else if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
@@ -266,8 +266,8 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
           )
         } else if (diagnosis$num_knots < min_knots) {
           # Moderate number of knots but still below recommended
-          if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 5) {
-            suggested_strength <- max(2, diagnosis$smoothing_strength / 2)
+          if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 1) {
+            suggested_strength <- max(0.1, diagnosis$smoothing_strength / 2)
             suggestions <- c(suggestions,
               sprintf("  - Either reduce smoothing_strength to %.0f (current: %.1f)",
                       suggested_strength, diagnosis$smoothing_strength),
@@ -333,8 +333,8 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
         if (too_many_basis) {
           # Suggest specific smoothing values based on current setting
           current_smooth <- ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)
-          if (current_smooth < 2) {
-            suggested_smooth <- 4
+          if (current_smooth < 0.1) {
+            suggested_smooth <- 0.2
           } else if (current_smooth < 5) {
             suggested_smooth = current_smooth * 2
           } else {
@@ -349,7 +349,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
           )
         } else {
           current_smooth <- ifelse(!is.na(diagnosis$smoothing_strength), diagnosis$smoothing_strength, 0)
-          suggested_smooth <- ifelse(current_smooth < 2, 2, current_smooth * 1.5)
+          suggested_smooth <- ifelse(current_smooth < 0.05, 0.1, current_smooth * 1.5)
           
           suggestions <- c(suggestions,
             sprintf("  - Try smoothing_strength = %.0f (current: %.1f) for smoother fit", 
@@ -550,7 +550,7 @@ print_smoothing_diagnostics <- function(diagnosis) {
     }
     # Add general advice about parameter adjustment
     cat("\nParameter adjustment guide:\n")
-    cat("- smoothing_strength: 0=none, 1-2=mild, 5-10=strong smoothing (scales with number of basis functions)\n")
+    cat("- smoothing_strength: 0=none, 0.05-0.1=mild (0.1 default), 0.1-0.2=strong (scales with num_basis^sqrt(2))\n")
     cat("- num_knots: Keep high enough to capture function complexity, adjust smoothing for regularization\n")
     
     cat("\nInterpreting the metrics:\n")
@@ -606,7 +606,7 @@ example_diagnostics <- function() {
     y = y,
     num_knots = 4,      # Few knots
     spline_degree = 3,
-    smoothing_strength = 10  # Strong smoothing
+    smoothing_strength = 0.15  # Strong smoothing with new formula
   )
   
   cat("\nFitting with restrictive settings (likely to over-smooth)...\n")

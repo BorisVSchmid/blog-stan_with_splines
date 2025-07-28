@@ -17,8 +17,8 @@ Original source: https://github.com/milkha/Splines_in_Stan
      ```
    - **Key innovation**: Higher `smoothing_strength` = MORE smoothing (smoother curves)
      - `smoothing_strength = 0`: No smoothing (independent coefficients)
-     - `smoothing_strength = 1-2`: Mild smoothing
-     - `smoothing_strength = 5-10`: Strong smoothing
+     - `smoothing_strength = 0.05-0.1`: Mild smoothing (0.1 is default)
+     - `smoothing_strength = 0.1-0.2`: Strong smoothing
    - This ensures consistent smoothing behavior regardless of data scale or number of knots
    - The inverted relationship is more intuitive: larger values mean more smoothing
 

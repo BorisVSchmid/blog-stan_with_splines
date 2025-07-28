@@ -138,9 +138,9 @@ source("examples/run_regional_splines.R")   # Regional hierarchical models
 **3. Explicit Smoothing Control**
 - The `smoothing_strength` parameter provides fine control
 - 0 = no smoothing (independent coefficients)
-- 1-2 = mild smoothing (typical default)
-- 5-10 = strong smoothing
-- Scale-invariant smoothing that adapts to the y-axis standard deviation and the number of basis functions
+- 0.05-0.1 = mild smoothing (0.1 is default)
+- 0.1-0.2 = strong smoothing
+- Scale-invariant smoothing that adapts to the y-axis standard deviation and the number of basis functions (num_basis^sqrt(2))
 - Example: Adjusting smoothness based on data quality or sample size
 
 **4. Hierarchical Modeling**
@@ -175,7 +175,7 @@ source("examples/run_regional_splines.R")   # Regional hierarchical models
 # Modeling epidemic curves with potential sharp features
 epidemic_fit <- fit_bspline(outbreak_data, 
                            num_knots = 15,        # More knots for flexibility
-                           smoothing_strength = 1)  # Default smoothing
+                           smoothing_strength = 0.1)  # Default mild smoothing
 
 # Regional models with local variation
 regional_model <- stan("regional_splines.stan", 
@@ -209,7 +209,7 @@ B-splines now include a sophisticated scale-invariant smoothing system:
 
 ```r
 # The smoothing parameter adapts to your data automatically
-tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis)
+tau_smooth = prior_scale / (smoothing_strength * num_basis^sqrt(2))
 ```
 
 **Key features:**
@@ -217,8 +217,8 @@ tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis)
 - **Basis-aware**: Accounts for the number of basis functions
 - **Intuitive control**: 
   - `smoothing_strength = 0`: No smoothing (independent coefficients)
-  - `smoothing_strength = 1-2`: Mild smoothing (recommended default)
-  - `smoothing_strength = 5-10`: Strong smoothing
+  - `smoothing_strength = 0.05-0.1`: Mild smoothing (0.1 is recommended default)
+  - `smoothing_strength = 0.1-0.2`: Strong smoothing
 
 The implementation uses a random walk prior on coefficients:
 ```stan
@@ -441,7 +441,7 @@ model {
 1. **Knot placement**: Place knots at quantiles of your x data
 2. **Extended knots**: Repeat boundary knots `spline_degree` times
 3. **Basis construction**: Use `build_b_spline` to create basis matrix
-4. **Smoothing**: Apply random walk prior with `tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis)`
+4. **Smoothing**: Apply random walk prior with `tau_smooth = prior_scale / (smoothing_strength * num_basis^sqrt(2))`
 
 #### C-splines
 1. **Include directive**: Must have `spline.stan` file in same directory or in include path
@@ -472,9 +472,9 @@ See these files for complete, working implementations:
 
 **Smoothing (B-splines only)**:
 - `smoothing_strength = 0`: No smoothing (independent coefficients)
-- `smoothing_strength = 1-2`: Mild smoothing (recommended default)
-- `smoothing_strength = 5-10`: Strong smoothing
-- The parameter automatically scales with data variance and number of basis functions
+- `smoothing_strength = 0.05-0.1`: Mild smoothing (0.1 is recommended default)
+- `smoothing_strength = 0.1-0.2`: Strong smoothing
+- The parameter automatically scales with data variance and number of basis functions (num_basis^sqrt(2))
 
 **Prior scale**:
 - Set to `2 * sd(y)` for automatic scaling

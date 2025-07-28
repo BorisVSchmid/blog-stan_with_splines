@@ -2,12 +2,13 @@
 // 
 // Key changes from standard implementations:
 // 1. Inverted smoothing parameter: Higher smoothing_strength = MORE smoothing (smoother curves)
-//    In typical implementations, larger tau = more flexibility. Here, we use tau = 1/sqrt(smoothing_strength)
+//    In typical implementations, larger tau = more flexibility. Here, we invert this relationship
 //    so that smoothing_strength=0 means no smoothing, and larger values increase smoothing.
 // 2. Scale-invariant: Smoothing behavior is independent of data scale (y values range)
-//    A smoothing_strength of 4.0 provides the same smoothness whether y ranges from -1 to 1 or -1000 to 1000
+//    A given smoothing_strength provides the same smoothness whether y ranges from -1 to 1 or -1000 to 1000
 // 3. Knot-count invariant: Smoothing behavior is more consistent across different knot counts
-//    Uses tau = prior_scale / (smoothing_strength * sqrt(num_basis)) for better scaling
+//    Uses tau = prior_scale / (smoothing_strength * num_basis^sqrt(2)) for better scaling
+//    The num_basis^sqrt(2) scaling provides consistent smoothing across different basis counts
 
 functions {
   vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
@@ -45,7 +46,7 @@ data {
   vector[n_data] y;
   int<lower=1> num_knots;
   int<lower=1> spline_degree;
-  real<lower=0> smoothing_strength;  // Smoothing strength (0=none, 1-2=mild, 5-10=strong)
+  real<lower=0> smoothing_strength;  // Smoothing strength (0=none, 0.05-0.1=mild, 0.1-0.2=strong)
   real<lower=0> prior_scale;         // Scale for coefficient priors
 }
 
@@ -72,7 +73,10 @@ transformed data {
     tau_smooth = 0;  // Special case: triggers independent coefficients
   } else {
     // Updated formula: separates linear smoothing effect from sqrt basis scaling
-    tau_smooth = prior_scale / (smoothing_strength * square(num_basis));  // Scale by data variance and number of basis functions
+    // Scale by data variance and number of basis functions. That num_basis^sqrt(2)
+    // seems to fit well probably has some relationship with random walk behavior
+    // that could be worked out deeper.
+    tau_smooth = prior_scale / (smoothing_strength * pow(num_basis, sqrt(2)));
   }
   
   {

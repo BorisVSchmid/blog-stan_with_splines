@@ -46,7 +46,7 @@ test_cubic_polynomial <- function() {
     y = y,
     num_knots = adaptive_knots_b,
     spline_degree = 3,
-    smoothing_strength = 1.0,  # Default smoothing
+    smoothing_strength = 0.1,  # Default mild smoothing
     prior_scale = adaptive_prior
   )
   
@@ -150,7 +150,7 @@ test_constant_function <- function() {
     y = y,
     num_knots = adaptive_knots_b,
     spline_degree = 3,
-    smoothing_strength = 1.0,  # Default smoothing
+    smoothing_strength = 0.1,  # Default mild smoothing
     prior_scale = adaptive_prior
   )
   
@@ -269,7 +269,7 @@ test_step_function <- function() {
     y = y,
     num_knots = adaptive_knots_b,
     spline_degree = 3,
-    smoothing_strength = 1.0,  # Default smoothing
+    smoothing_strength = 0.1,  # Default mild smoothing
     prior_scale = adaptive_prior
   )
   
@@ -388,7 +388,7 @@ test_sine_wave <- function() {
     y = y,
     num_knots = adaptive_knots_b,  # Adaptive selection
     spline_degree = 3,
-    smoothing_strength = 1.0,  # Default smoothing
+    smoothing_strength = 0.1,  # Default mild smoothing
     prior_scale = adaptive_prior
   )
   

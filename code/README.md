@@ -17,7 +17,7 @@ Self-contained B-spline implementation with:
 Parameters:
 - `num_knots`: Number of interior knots
 - `spline_degree`: Polynomial degree (default 3 for cubic)
-- `smoothing_strength`: Controls smoothness (0=none, 1-2=mild, 5-10=strong)
+- `smoothing_strength`: Controls smoothness (0=none, 0.05-0.1=mild, 0.1-0.2=strong)
 - `prior_scale`: Scale for coefficient priors
 
 ### csplines.stan
@@ -106,7 +106,7 @@ stan_data <- list(
   y = y,
   num_knots = 10,
   spline_degree = 3,
-  smoothing_strength = 1,
+  smoothing_strength = 0.1,
   prior_scale = 2 * sd(y)
 )
 
@@ -145,7 +145,7 @@ print_smoothing_diagnostics(diagnosis)
 
 ### B-splines
 - `num_knots`: Start with n/2 for flexibility, adjust based on diagnostics
-- `smoothing_strength`: 0=none, 1-2=mild (typical), 5-10=strong (scales with num_basis)
+- `smoothing_strength`: 0=none, 0.05-0.1=mild (0.1 default), 0.1-0.2=strong (scales with num_basis^sqrt(2))
 - `spline_degree`: 3 (cubic) is standard, 2 (quadratic) for simpler curves
 
 ### C-splines
