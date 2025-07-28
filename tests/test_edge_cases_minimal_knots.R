@@ -43,7 +43,7 @@ stan_data_2knots <- list(
   y = y,
   num_knots = 2,  # Minimum allowed for B-splines
   spline_degree = 3,
-  smoothing_strength = 2.0,
+  smoothing_strength = 1.0,
   prior_scale = 2 * sd(y)
 )
 
@@ -119,7 +119,7 @@ stan_data_b <- list(
   y = y,
   num_knots = 3,  # One interior knot plus boundaries
   spline_degree = 3,
-  smoothing_strength = 2.0,
+  smoothing_strength = 1.0,
   prior_scale = 2 * sd(y)
 )
 

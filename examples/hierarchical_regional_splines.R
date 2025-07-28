@@ -96,7 +96,7 @@ stan_data <- list(
   region = data$region,
   num_knots = max(4, min(round(n_per_region/2), 40)),  # n/2 rule
   spline_degree = 3,
-  smoothing_strength = 2,        # Default smoothing
+  smoothing_strength = 1,        # Default smoothing
   prior_scale = 2 * sd(data$y)  # Adaptive prior scale
 )
 

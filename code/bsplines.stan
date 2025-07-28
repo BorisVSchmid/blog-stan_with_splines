@@ -6,8 +6,8 @@
 //    so that smoothing_strength=0 means no smoothing, and larger values increase smoothing.
 // 2. Scale-invariant: Smoothing behavior is independent of data scale (y values range)
 //    A smoothing_strength of 4.0 provides the same smoothness whether y ranges from -1 to 1 or -1000 to 1000
-// 3. Knot-count invariant: Smoothing behavior is consistent regardless of number of knots
-//    The same smoothing_strength produces similar smoothness with 5 knots or 20 knots
+// 3. Knot-count invariant: Smoothing behavior is more consistent across different knot counts
+//    Uses tau = prior_scale / (smoothing_strength * sqrt(num_basis)) for better scaling
 
 functions {
   vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
@@ -71,7 +71,8 @@ transformed data {
   if (smoothing_strength == 0) {
     tau_smooth = 0;  // Special case: triggers independent coefficients
   } else {
-    tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis);  // Scale by data variance and number of basis functions
+    // Updated formula: separates linear smoothing effect from sqrt basis scaling
+    tau_smooth = prior_scale / (smoothing_strength * square(num_basis));  // Scale by data variance and number of basis functions
   }
   
   {

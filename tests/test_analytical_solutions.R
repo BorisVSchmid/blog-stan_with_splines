@@ -33,49 +33,96 @@ test_cubic_polynomial <- function() {
   y_true <- x^3 - 2*x^2 + x + 1
   y <- y_true + rnorm(n, 0, 0.05)  # Small amount of noise
   
-  # Use adaptive knot selection (n/4 for C-splines)
-  adaptive_knots <- max(4, min(round(n/4), 20))
+  results <- list()
   
-  # Test with C-splines (should handle cubics well)
-  stan_data <- list(
+  # Test with B-splines
+  cat("  Testing B-splines...\n")
+  adaptive_knots_b <- max(4, min(round(n/2), 40))
+  adaptive_prior <- 2 * sd(y)
+  
+  stan_data_b <- list(
     n_data = n,
     x = x,
     y = y,
-    num_knots = adaptive_knots
+    num_knots = adaptive_knots_b,
+    spline_degree = 3,
+    smoothing_strength = 1.0,  # Default smoothing
+    prior_scale = adaptive_prior
   )
   
-  model <- cmdstan_model("code/csplines.stan")
-  cat("  [Test 1 - C-spline cubic polynomial fitting] Fitting model...\n")
-  fit <- model$sample(
-    data = stan_data,
+  model_b <- cmdstan_model("code/bsplines.stan")
+  cat("  [Test 1 - B-spline cubic polynomial fitting] Fitting model...\n")
+  fit_b <- model_b$sample(
+    data = stan_data_b,
     chains = 4,
     parallel_chains = 4,
-    iter_warmup = 300,
-    iter_sampling = 600,
+    iter_warmup = 500,
+    iter_sampling = 1000,
+    refresh = 0,
+    adapt_delta = 0.99,
+    max_treedepth = 15
+  )
+  
+  draws_b <- fit_b$draws(format = "matrix")
+  x_plot_b <- colMeans(draws_b[, grep("x_plot\\[", colnames(draws_b), value = TRUE)])
+  y_plot_b <- colMeans(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)])
+  
+  # Compare with true cubic
+  y_true_plot_b <- x_plot_b^3 - 2*x_plot_b^2 + x_plot_b + 1
+  rmse_b <- sqrt(mean((y_plot_b - y_true_plot_b)^2))
+  
+  cat("  B-spline RMSE from true cubic:", round(rmse_b, 4), "\n")
+  
+  # Test with C-splines (should handle cubics well)
+  cat("  Testing C-splines...\n")
+  adaptive_knots_c <- max(4, min(round(n/4), 20))
+  
+  stan_data_c <- list(
+    n_data = n,
+    x = x,
+    y = y,
+    num_knots = adaptive_knots_c
+  )
+  
+  model_c <- cmdstan_model("code/csplines.stan")
+  cat("  [Test 1 - C-spline cubic polynomial fitting] Fitting model...\n")
+  fit_c <- model_c$sample(
+    data = stan_data_c,
+    chains = 4,
+    parallel_chains = 4,
+    iter_warmup = 500,
+    iter_sampling = 1000,
+    max_treedepth = 15,
+    adapt_delta = 0.99,
     refresh = 0
   )
   
-  draws <- fit$draws(format = "matrix")
-  x_plot <- colMeans(draws[, grep("x_plot\\[", colnames(draws), value = TRUE)])
-  y_plot <- colMeans(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)])
+  draws_c <- fit_c$draws(format = "matrix")
+  x_plot_c <- colMeans(draws_c[, grep("x_plot\\[", colnames(draws_c), value = TRUE)])
+  y_plot_c <- colMeans(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)])
   
   # Compare with true cubic
-  y_true_plot <- x_plot^3 - 2*x_plot^2 + x_plot + 1
-  rmse <- sqrt(mean((y_plot - y_true_plot)^2))
+  y_true_plot_c <- x_plot_c^3 - 2*x_plot_c^2 + x_plot_c + 1
+  rmse_c <- sqrt(mean((y_plot_c - y_true_plot_c)^2))
   
-  cat("  RMSE from true cubic function:", round(rmse, 4), "\n")
+  cat("  C-spline RMSE from true cubic:", round(rmse_c, 4), "\n")
   
   # Should fit cubic well
   tolerance <- 0.3
-  fits_well <- rmse < tolerance
+  results$b_spline <- rmse_b < tolerance
+  results$c_spline <- rmse_c < tolerance
   
-  cat("  Fits cubic well (RMSE <", tolerance, "):", fits_well, "\n")
+  cat("  B-spline fits cubic well (RMSE <", tolerance, "):", results$b_spline, "\n")
+  cat("  C-spline fits cubic well (RMSE <", tolerance, "):", results$c_spline, "\n")
   
-  # Store fit and parameters in parent environment for plotting
-  assign("fit_cubic", fit, envir = parent.frame())
-  assign("cubic_knots", stan_data$num_knots, envir = parent.frame())
+  # Store fits and parameters in parent environment for plotting
+  assign("fit_cubic_b", fit_b, envir = parent.frame())
+  assign("fit_cubic_c", fit_c, envir = parent.frame())
+  assign("cubic_b_knots", stan_data_b$num_knots, envir = parent.frame())
+  assign("cubic_b_smoothing", stan_data_b$smoothing_strength, envir = parent.frame())
+  assign("cubic_c_knots", stan_data_c$num_knots, envir = parent.frame())
   
-  return(fits_well)
+  return(results)
 }
 
 # Test 2: Constant function
@@ -87,7 +134,7 @@ test_constant_function <- function() {
   n <- 12
   x <- seq(0, 10, length.out = n)
   constant_value <- 2.5
-  y <- rep(constant_value, n) + rnorm(n, 0, 0.05)  # Increased noise to avoid sigma approaching 0
+  y <- rep(constant_value, n) + rnorm(n, 0, 0.02)  # Small noise
   
   results <- list()
   
@@ -103,7 +150,7 @@ test_constant_function <- function() {
     y = y,
     num_knots = adaptive_knots_b,
     spline_degree = 3,
-    smoothing_strength = 2,  # Default smoothing
+    smoothing_strength = 1.0,  # Default smoothing
     prior_scale = adaptive_prior
   )
   
@@ -114,9 +161,10 @@ test_constant_function <- function() {
     chains = 4,
     parallel_chains = 4,
     iter_warmup = 500,
-    iter_sampling = 600,
+    iter_sampling = 1000,
     refresh = 0,
-    adapt_delta = 0.98,  # Even higher for constant function with low noise
+    adapt_delta = 0.99,
+    max_treedepth = 12,
     init = function() list(
       alpha_0 = mean(y),
       alpha_raw = rnorm(stan_data_b$num_knots + stan_data_b$spline_degree - 1, 0, 0.1),
@@ -148,10 +196,11 @@ test_constant_function <- function() {
     data = stan_data_c,
     chains = 4,
     parallel_chains = 4,
-    iter_warmup = 200,
-    iter_sampling = 400,
+    iter_warmup = 500,
+    iter_sampling = 1000,
     refresh = 0,
-    adapt_delta = 0.95,  # Higher to handle low noise case
+    adapt_delta = 0.99, 
+    max_treedepth = 12,
     init = function() list(
       y_at_knots = rep(mean(y), stan_data_c$num_knots),
       sigma = 0.1  # Initialize sigma away from 0
@@ -209,59 +258,107 @@ test_step_function <- function() {
   # Test with both splines
   results <- list()
   
-  # Use adaptive knot selection (n/4 for C-splines)
-  adaptive_knots <- max(4, min(round(n/4), 20))
+  # Test B-splines
+  cat("  Testing B-splines...\n")
+  adaptive_knots_b <- max(4, min(round(n/2), 40))
+  adaptive_prior <- 2 * sd(y)
   
-  # C-splines
-  cat("  Testing C-splines...\n")
-  stan_data <- list(
+  stan_data_b <- list(
     n_data = n,
     x = x,
     y = y,
-    num_knots = adaptive_knots
+    num_knots = adaptive_knots_b,
+    spline_degree = 3,
+    smoothing_strength = 1.0,  # Default smoothing
+    prior_scale = adaptive_prior
   )
   
-  model <- cmdstan_model("code/csplines.stan")
-  fit <- model$sample(
-    data = stan_data,
+  model_b <- cmdstan_model("code/bsplines.stan")
+  fit_b <- model_b$sample(
+    data = stan_data_b,
     chains = 4,
     parallel_chains = 4,
-    iter_warmup = 200,
-    iter_sampling = 400,
+    iter_warmup = 500,
+    iter_sampling = 1000,
     refresh = 0
   )
   
-  draws <- fit$draws(format = "matrix")
-  x_plot <- colMeans(draws[, grep("x_plot\\[", colnames(draws), value = TRUE)])
-  y_plot <- colMeans(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)])
+  draws_b <- fit_b$draws(format = "matrix")
+  x_plot_b <- colMeans(draws_b[, grep("x_plot\\[", colnames(draws_b), value = TRUE)])
+  y_plot_b <- colMeans(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)])
   
-  # Check if spline captures the step reasonably
-  # Values before step should be closer to 1, after step closer to 3
-  before_step <- y_plot[x_plot < 5]
-  after_step <- y_plot[x_plot > 5]
+  # Check if B-spline captures the step reasonably
+  before_step_b <- y_plot_b[x_plot_b < 5]
+  after_step_b <- y_plot_b[x_plot_b > 5]
   
-  mean_before <- mean(before_step)
-  mean_after <- mean(after_step)
-  step_height <- mean_after - mean_before
+  mean_before_b <- mean(before_step_b)
+  mean_after_b <- mean(after_step_b)
+  step_height_b <- mean_after_b - mean_before_b
   
-  cat("  Mean value before step (should be ~1):", round(mean_before, 2), "\n")
-  cat("  Mean value after step (should be ~3):", round(mean_after, 2), "\n")
-  cat("  Step height (should be ~2):", round(step_height, 2), "\n")
+  cat("  B-spline - Mean before step (should be ~1):", round(mean_before_b, 2), "\n")
+  cat("  B-spline - Mean after step (should be ~3):", round(mean_after_b, 2), "\n")
+  cat("  B-spline - Step height (should be ~2):", round(step_height_b, 2), "\n")
+  
+  # Test C-splines
+  cat("  Testing C-splines...\n")
+  adaptive_knots_c <- max(4, min(round(n/4), 20))
+  
+  stan_data_c <- list(
+    n_data = n,
+    x = x,
+    y = y,
+    num_knots = adaptive_knots_c
+  )
+  
+  model_c <- cmdstan_model("code/csplines.stan")
+  fit_c <- model_c$sample(
+    data = stan_data_c,
+    chains = 4,
+    parallel_chains = 4,
+    iter_warmup = 500,
+    iter_sampling = 1000,
+    refresh = 0
+  )
+  
+  draws_c <- fit_c$draws(format = "matrix")
+  x_plot_c <- colMeans(draws_c[, grep("x_plot\\[", colnames(draws_c), value = TRUE)])
+  y_plot_c <- colMeans(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)])
+  
+  # Check if C-spline captures the step reasonably
+  before_step_c <- y_plot_c[x_plot_c < 5]
+  after_step_c <- y_plot_c[x_plot_c > 5]
+  
+  mean_before_c <- mean(before_step_c)
+  mean_after_c <- mean(after_step_c)
+  step_height_c <- mean_after_c - mean_before_c
+  
+  cat("  C-spline - Mean before step (should be ~1):", round(mean_before_c, 2), "\n")
+  cat("  C-spline - Mean after step (should be ~3):", round(mean_after_c, 2), "\n")
+  cat("  C-spline - Step height (should be ~2):", round(step_height_c, 2), "\n")
   
   # Check if step is reasonably approximated
-  reasonable_before <- abs(mean_before - 1) < 0.5
-  reasonable_after <- abs(mean_after - 3) < 0.5
-  reasonable_step <- abs(step_height - 2) < 0.8
+  reasonable_before_b <- abs(mean_before_b - 1) < 0.5
+  reasonable_after_b <- abs(mean_after_b - 3) < 0.5
+  reasonable_step_b <- abs(step_height_b - 2) < 0.8
   
-  step_approximated <- reasonable_before && reasonable_after && reasonable_step
+  reasonable_before_c <- abs(mean_before_c - 1) < 0.5
+  reasonable_after_c <- abs(mean_after_c - 3) < 0.5
+  reasonable_step_c <- abs(step_height_c - 2) < 0.8
   
-  cat("  Step function reasonably approximated:", step_approximated, "\n")
+  results$b_spline <- reasonable_before_b && reasonable_after_b && reasonable_step_b
+  results$c_spline <- reasonable_before_c && reasonable_after_c && reasonable_step_c
   
-  # Store fit and parameters in parent environment for plotting
-  assign("fit_step", fit, envir = parent.frame())
-  assign("step_knots", stan_data$num_knots, envir = parent.frame())
+  cat("  B-spline step function approximated well:", results$b_spline, "\n")
+  cat("  C-spline step function approximated well:", results$c_spline, "\n")
   
-  return(step_approximated)
+  # Store fits and parameters in parent environment for plotting
+  assign("fit_step_b", fit_b, envir = parent.frame())
+  assign("fit_step_c", fit_c, envir = parent.frame())
+  assign("step_b_knots", stan_data_b$num_knots, envir = parent.frame())
+  assign("step_b_smoothing", stan_data_b$smoothing_strength, envir = parent.frame())
+  assign("step_c_knots", stan_data_c$num_knots, envir = parent.frame())
+  
+  return(results)
 }
 
 # Test 4: Sine wave fitting
@@ -291,7 +388,7 @@ test_sine_wave <- function() {
     y = y,
     num_knots = adaptive_knots_b,  # Adaptive selection
     spline_degree = 3,
-    smoothing_strength = 2,  # Default smoothing
+    smoothing_strength = 1.0,  # Default smoothing
     prior_scale = adaptive_prior
   )
   
@@ -301,9 +398,10 @@ test_sine_wave <- function() {
     chains = 4,
     parallel_chains = 4,
     iter_warmup = 500,
-    iter_sampling = 700,
+    iter_sampling = 1000,
     refresh = 0,
-    adapt_delta = 0.95
+    adapt_delta = 0.99,
+    max_treedepth = 12
   )
   
   draws_b <- fit_b$draws(format = "matrix")
@@ -332,9 +430,10 @@ test_sine_wave <- function() {
     chains = 4,
     parallel_chains = 4,
     iter_warmup = 500,
-    iter_sampling = 700,
+    iter_sampling = 1000,
     refresh = 0,
-    adapt_delta = 0.95
+    adapt_delta = 0.99,
+    max_treedepth = 12
   )
   
   draws_c <- fit_c$draws(format = "matrix")
@@ -376,7 +475,7 @@ tryCatch({
   analytical_test_results$cubic_polynomial <- test_cubic_polynomial()
 }, error = function(e) {
   cat("Error in cubic polynomial test:", e$message, "\n")
-  analytical_test_results$cubic_polynomial <<- FALSE
+  analytical_test_results$cubic_polynomial <<- list(b_spline = FALSE, c_spline = FALSE)
 })
 
 tryCatch({
@@ -390,7 +489,7 @@ tryCatch({
   analytical_test_results$step_function <- test_step_function()
 }, error = function(e) {
   cat("Error in step function test:", e$message, "\n")
-  analytical_test_results$step_function <<- FALSE
+  analytical_test_results$step_function <<- list(b_spline = FALSE, c_spline = FALSE)
 })
 
 tryCatch({
@@ -409,40 +508,89 @@ library(patchwork)
 # Store all fits for plotting
 all_fits <- list()
 
-# 1. Cubic polynomial plot
-if (exists("fit_cubic")) {
+# 1. Cubic polynomial plots (B-splines and C-splines)
+# B-spline cubic
+if (exists("fit_cubic_b")) {
   tryCatch({
-    draws <- fit_cubic$draws(format = "matrix")
-  x_plot <- colMeans(draws[, grep("x_plot\\[", colnames(draws), value = TRUE)])
-  y_plot <- colMeans(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)])
-  y_plot_lower <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.025)
-  y_plot_upper <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.975)
-  
-  # True cubic function
-  y_true_plot <- x_plot^3 - 2*x_plot^2 + x_plot + 1
-  
-  df_cubic <- data.frame(
-    x = x_plot,
-    y_fitted = y_plot,
-    y_lower = y_plot_lower,
-    y_upper = y_plot_upper,
-    y_true = y_true_plot
-  )
-  
-  p_cubic <- ggplot(df_cubic) +
-    geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "darkgreen") +
-    geom_line(aes(x = x, y = y_fitted), color = "darkgreen", linewidth = 1.2) +
-    geom_line(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
-    labs(title = "Cubic Polynomial: y = x³ - 2x² + x + 1",
-         subtitle = paste0("C-splines (knots = ", cubic_knots, ") should fit cubic polynomials perfectly"),
-         x = "x", y = "y") +
-    theme_bw() +
-    theme(plot.title = element_text(size = 10),
-          plot.subtitle = element_text(size = 8))
-  
-    all_fits$cubic <- p_cubic
+    draws_b <- fit_cubic_b$draws(format = "matrix")
+    x_plot_b <- colMeans(draws_b[, grep("x_plot\\[", colnames(draws_b), value = TRUE)])
+    y_plot_b <- colMeans(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)])
+    y_plot_b_lower <- apply(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)], 2, quantile, 0.025)
+    y_plot_b_upper <- apply(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)], 2, quantile, 0.975)
+    
+    # True cubic function
+    y_true_plot_b <- x_plot_b^3 - 2*x_plot_b^2 + x_plot_b + 1
+    
+    df_cubic_b <- data.frame(
+      x = x_plot_b,
+      y_fitted = y_plot_b,
+      y_lower = y_plot_b_lower,
+      y_upper = y_plot_b_upper,
+      y_true = y_true_plot_b
+    )
+    
+    # Get data points from test
+    x_data <- seq(0, 3, length.out = 15)
+    # Regenerate with noise to match test
+    set.seed(123)
+    y_data <- x_data^3 - 2*x_data^2 + x_data + 1 + rnorm(15, 0, 0.05)
+    
+    p_cubic_b <- ggplot(df_cubic_b) +
+      geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "blue") +
+      geom_line(aes(x = x, y = y_fitted), color = "blue", linewidth = 1.2) +
+      geom_line(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+      geom_point(data = data.frame(x = x_data, y = y_data), 
+                 aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
+      labs(title = "Cubic Polynomial: y = x³ - 2x² + x + 1 (B-splines)",
+           subtitle = paste0("Knots = ", cubic_b_knots, ", smoothing = ", cubic_b_smoothing),
+           x = "x", y = "y") +
+      theme_bw() +
+      theme(plot.title = element_text(size = 10),
+            plot.subtitle = element_text(size = 8))
+    
+    all_fits$cubic_b <- p_cubic_b
   }, error = function(e) {
-    cat("  Warning: Could not create cubic polynomial plot:", e$message, "\n")
+    cat("  Warning: Could not create B-spline cubic polynomial plot:", e$message, "\n")
+  })
+}
+
+# C-spline cubic
+if (exists("fit_cubic_c")) {
+  tryCatch({
+    draws_c <- fit_cubic_c$draws(format = "matrix")
+    x_plot_c <- colMeans(draws_c[, grep("x_plot\\[", colnames(draws_c), value = TRUE)])
+    y_plot_c <- colMeans(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)])
+    y_plot_c_lower <- apply(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)], 2, quantile, 0.025)
+    y_plot_c_upper <- apply(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)], 2, quantile, 0.975)
+    
+    # True cubic function
+    y_true_plot_c <- x_plot_c^3 - 2*x_plot_c^2 + x_plot_c + 1
+    
+    df_cubic_c <- data.frame(
+      x = x_plot_c,
+      y_fitted = y_plot_c,
+      y_lower = y_plot_c_lower,
+      y_upper = y_plot_c_upper,
+      y_true = y_true_plot_c
+    )
+    
+    # Use same data points
+    p_cubic_c <- ggplot(df_cubic_c) +
+      geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "darkgreen") +
+      geom_line(aes(x = x, y = y_fitted), color = "darkgreen", linewidth = 1.2) +
+      geom_line(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+      geom_point(data = data.frame(x = x_data, y = y_data), 
+                 aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
+      labs(title = "Cubic Polynomial: y = x³ - 2x² + x + 1 (C-splines)",
+           subtitle = paste0("Knots = ", cubic_c_knots),
+           x = "x", y = "y") +
+      theme_bw() +
+      theme(plot.title = element_text(size = 10),
+            plot.subtitle = element_text(size = 8))
+    
+    all_fits$cubic_c <- p_cubic_c
+  }, error = function(e) {
+    cat("  Warning: Could not create C-spline cubic polynomial plot:", e$message, "\n")
   })
 }
 
@@ -465,16 +613,24 @@ if (exists("fit_constant_b")) {
     y_upper = y_plot_b_upper
   )
   
+  # Get data points from test
+  x_data <- seq(0, 10, length.out = 12)
+  set.seed(123)
+  y_data <- rep(2.5, 12) + rnorm(12, 0, 0.02)
+  
   p_constant_b <- ggplot(df_const_b) +
     geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "blue") +
     geom_line(aes(x = x, y = y_fitted), color = "blue", linewidth = 1.2) +
     geom_hline(yintercept = 2.5, color = "black", linetype = "dashed", linewidth = 1) +
+    geom_point(data = data.frame(x = x_data, y = y_data), 
+               aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
     labs(title = "Constant Function: y = 2.5 (B-splines)",
-         subtitle = paste0("Knots = ", constant_b_knots, ", smoothing = ", constant_b_smoothing, " (should be flat)"),
+         subtitle = paste0("Knots = ", constant_b_knots, ", smoothing = ", constant_b_smoothing),
          x = "x", y = "y") +
     theme_bw() +
     theme(plot.title = element_text(size = 10),
-          plot.subtitle = element_text(size = 8))
+          plot.subtitle = element_text(size = 8)) +
+    ylim(2.2, 2.8)
   
   all_fits$constant_b <- p_constant_b
   }, error = function(e) {
@@ -497,16 +653,20 @@ if (exists("fit_constant_c")) {
     y_upper = y_plot_c_upper
   )
   
+  # Use same data points
   p_constant_c <- ggplot(df_const_c) +
     geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "darkgreen") +
     geom_line(aes(x = x, y = y_fitted), color = "darkgreen", linewidth = 1.2) +
     geom_hline(yintercept = 2.5, color = "black", linetype = "dashed", linewidth = 1) +
+    geom_point(data = data.frame(x = x_data, y = y_data), 
+               aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
     labs(title = "Constant Function: y = 2.5 (C-splines)",
-         subtitle = paste0("Knots = ", constant_c_knots, " (should be flat)"),
+         subtitle = paste0("Knots = ", constant_c_knots),
          x = "x", y = "y") +
     theme_bw() +
     theme(plot.title = element_text(size = 10),
-          plot.subtitle = element_text(size = 8))
+          plot.subtitle = element_text(size = 8)) +
+    ylim(2.2, 2.8)
   
   all_fits$constant_c <- p_constant_c
   }, error = function(e) {
@@ -516,40 +676,88 @@ if (exists("fit_constant_c")) {
 
 # Don't combine constant plots - let patchwork handle the layout
 
-# 3. Step function plot
-if (exists("fit_step")) {
+# 3. Step function plots (B-splines and C-splines)
+# B-spline step
+if (exists("fit_step_b")) {
   tryCatch({
-    draws <- fit_step$draws(format = "matrix")
-  x_plot <- colMeans(draws[, grep("x_plot\\[", colnames(draws), value = TRUE)])
-  y_plot <- colMeans(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)])
-  y_plot_lower <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.025)
-  y_plot_upper <- apply(draws[, grep("y_plot\\[", colnames(draws), value = TRUE)], 2, quantile, 0.975)
-  
-  # True step function
-  y_true_step <- ifelse(x_plot < 5, 1, 3)
-  
-  df_step <- data.frame(
-    x = x_plot,
-    y_fitted = y_plot,
-    y_lower = y_plot_lower,
-    y_upper = y_plot_upper,
-    y_true = y_true_step
-  )
-  
-  p_step <- ggplot(df_step) +
-    geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "darkgreen") +
-    geom_line(aes(x = x, y = y_fitted), color = "darkgreen", linewidth = 1.2) +
-    geom_step(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
-    labs(title = "Step Function Approximation (C-splines)",
-         subtitle = paste0("Knots = ", step_knots, " (creates smooth transition)"),
-         x = "x", y = "y") +
-    theme_bw() +
-    theme(plot.title = element_text(size = 10),
-          plot.subtitle = element_text(size = 8))
-  
-  all_fits$step <- p_step
+    draws_b <- fit_step_b$draws(format = "matrix")
+    x_plot_b <- colMeans(draws_b[, grep("x_plot\\[", colnames(draws_b), value = TRUE)])
+    y_plot_b <- colMeans(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)])
+    y_plot_b_lower <- apply(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)], 2, quantile, 0.025)
+    y_plot_b_upper <- apply(draws_b[, grep("y_plot\\[", colnames(draws_b), value = TRUE)], 2, quantile, 0.975)
+    
+    # True step function
+    y_true_step_b <- ifelse(x_plot_b < 5, 1, 3)
+    
+    df_step_b <- data.frame(
+      x = x_plot_b,
+      y_fitted = y_plot_b,
+      y_lower = y_plot_b_lower,
+      y_upper = y_plot_b_upper,
+      y_true = y_true_step_b
+    )
+    
+    # Get data points from test
+    x_data <- seq(0, 10, length.out = 20)
+    set.seed(123)
+    y_data <- ifelse(x_data < 5, 1, 3) + rnorm(20, 0, 0.1)
+    
+    p_step_b <- ggplot(df_step_b) +
+      geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "blue") +
+      geom_line(aes(x = x, y = y_fitted), color = "blue", linewidth = 1.2) +
+      geom_step(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+      geom_point(data = data.frame(x = x_data, y = y_data), 
+                 aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
+      labs(title = "Step Function Approximation (B-splines)",
+           subtitle = paste0("Knots = ", step_b_knots, ", smoothing = ", step_b_smoothing),
+           x = "x", y = "y") +
+      theme_bw() +
+      theme(plot.title = element_text(size = 10),
+            plot.subtitle = element_text(size = 8))
+    
+    all_fits$step_b <- p_step_b
   }, error = function(e) {
-    cat("  Warning: Could not create step function plot:", e$message, "\n")
+    cat("  Warning: Could not create B-spline step function plot:", e$message, "\n")
+  })
+}
+
+# C-spline step
+if (exists("fit_step_c")) {
+  tryCatch({
+    draws_c <- fit_step_c$draws(format = "matrix")
+    x_plot_c <- colMeans(draws_c[, grep("x_plot\\[", colnames(draws_c), value = TRUE)])
+    y_plot_c <- colMeans(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)])
+    y_plot_c_lower <- apply(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)], 2, quantile, 0.025)
+    y_plot_c_upper <- apply(draws_c[, grep("y_plot\\[", colnames(draws_c), value = TRUE)], 2, quantile, 0.975)
+    
+    # True step function
+    y_true_step_c <- ifelse(x_plot_c < 5, 1, 3)
+    
+    df_step_c <- data.frame(
+      x = x_plot_c,
+      y_fitted = y_plot_c,
+      y_lower = y_plot_c_lower,
+      y_upper = y_plot_c_upper,
+      y_true = y_true_step_c
+    )
+    
+    # Use same data points
+    p_step_c <- ggplot(df_step_c) +
+      geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "darkgreen") +
+      geom_line(aes(x = x, y = y_fitted), color = "darkgreen", linewidth = 1.2) +
+      geom_step(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+      geom_point(data = data.frame(x = x_data, y = y_data), 
+                 aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
+      labs(title = "Step Function Approximation (C-splines)",
+           subtitle = paste0("Knots = ", step_c_knots),
+           x = "x", y = "y") +
+      theme_bw() +
+      theme(plot.title = element_text(size = 10),
+            plot.subtitle = element_text(size = 8))
+    
+    all_fits$step_c <- p_step_c
+  }, error = function(e) {
+    cat("  Warning: Could not create C-spline step function plot:", e$message, "\n")
   })
 }
 
@@ -571,10 +779,17 @@ if (exists("fit_sine_b")) {
       y_true = sin(x_plot_b)
     )
     
+    # Get data points from test
+    x_data <- seq(0, 4*pi, length.out = 25)
+    set.seed(123)
+    y_data <- sin(x_data) + rnorm(25, 0, 0.1)
+    
     p_sine_b <- ggplot(df_sine_b) +
       geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "blue") +
       geom_line(aes(x = x, y = y_fitted), color = "blue", linewidth = 1.2) +
       geom_line(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+      geom_point(data = data.frame(x = x_data, y = y_data), 
+                 aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
       labs(title = "Sine Wave: y = sin(x) (B-splines)",
            subtitle = paste0("Knots = ", sine_b_knots, ", smoothing = ", sine_b_smoothing),
            x = "x", y = "y") +
@@ -605,12 +820,15 @@ if (exists("fit_sine_c")) {
       y_true = sin(x_plot_c)
     )
     
+    # Use same data points
     p_sine_c <- ggplot(df_sine_c) +
       geom_ribbon(aes(x = x, ymin = y_lower, ymax = y_upper), alpha = 0.3, fill = "darkgreen") +
       geom_line(aes(x = x, y = y_fitted), color = "darkgreen", linewidth = 1.2) +
       geom_line(aes(x = x, y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+      geom_point(data = data.frame(x = x_data, y = y_data), 
+                 aes(x = x, y = y), color = "black", size = 2, alpha = 0.7) +
       labs(title = "Sine Wave: y = sin(x) (C-splines)",
-           subtitle = paste0("Knots = ", sine_c_knots, " (smooth periodic function)"),
+           subtitle = paste0("Knots = ", sine_c_knots),
            x = "x", y = "y") +
       theme_bw() +
       theme(plot.title = element_text(size = 10),
@@ -631,7 +849,8 @@ if (length(all_fits) > 0) {
   combined_plot <- wrap_plots(all_fits, ncol = 2) +
     plot_annotation(
       title = "Analytical Solutions Test: How Well Do Splines Handle Known Functions?",
-      subtitle = "Black dashed lines show true functions, colored lines show spline fits"
+      subtitle = "Black dashed lines show true functions, colored lines show spline fits (B-splines=blue, C-splines=green)",
+      caption = "Note: All tests use adaptive knot selection (B-splines: n/2 knots, C-splines: n/4 knots) with default smoothing=1.0 for B-splines"
     )
   
   # Save the plot
@@ -660,18 +879,22 @@ dev.off()
 # Summary
 cat("\n\nAnalytical Solutions Test Summary\n")
 cat("=================================\n")
-cat("Cubic polynomial (C-splines):", ifelse(analytical_test_results$cubic_polynomial, "PASS", "FAIL"), "\n")
+cat("Cubic polynomial (B-splines):", ifelse(analytical_test_results$cubic_polynomial$b_spline, "PASS", "FAIL"), "\n")
+cat("Cubic polynomial (C-splines):", ifelse(analytical_test_results$cubic_polynomial$c_spline, "PASS", "FAIL"), "\n")
 cat("Constant function (B-splines):", ifelse(analytical_test_results$constant_function$b_spline, "PASS", "FAIL"), "\n")
 cat("Constant function (C-splines):", ifelse(analytical_test_results$constant_function$c_spline, "PASS", "FAIL"), "\n")
-cat("Step function approximation:", ifelse(analytical_test_results$step_function, "PASS", "FAIL"), "\n")
+cat("Step function (B-splines):", ifelse(analytical_test_results$step_function$b_spline, "PASS", "FAIL"), "\n")
+cat("Step function (C-splines):", ifelse(analytical_test_results$step_function$c_spline, "PASS", "FAIL"), "\n")
 cat("Sine wave (B-splines):", ifelse(analytical_test_results$sine_wave$b_spline, "PASS", "FAIL"), "\n")
 cat("Sine wave (C-splines):", ifelse(analytical_test_results$sine_wave$c_spline, "PASS", "FAIL"), "\n")
 
 # Overall result
-all_passed <- analytical_test_results$cubic_polynomial &&
+all_passed <- analytical_test_results$cubic_polynomial$b_spline &&
+              analytical_test_results$cubic_polynomial$c_spline &&
               analytical_test_results$constant_function$b_spline &&
               analytical_test_results$constant_function$c_spline &&
-              analytical_test_results$step_function &&
+              analytical_test_results$step_function$b_spline &&
+              analytical_test_results$step_function$c_spline &&
               analytical_test_results$sine_wave$b_spline &&
               analytical_test_results$sine_wave$c_spline
 

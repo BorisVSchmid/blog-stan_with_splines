@@ -48,7 +48,7 @@ stan_data <- list(
   y = y,
   num_knots = adaptive_knots,     # Use adaptive knot selection (n/2)
   spline_degree = 3,              # Cubic splines (most common)
-  smoothing_strength = 2,         # Default smoothing (moderate for typical data with new scaling)
+  smoothing_strength = 1,         # Default smoothing (moderate for typical data with new scaling)
   prior_scale = adaptive_prior    # Data-driven prior
 )
 
@@ -59,7 +59,7 @@ model <- cmdstan_model("code/bsplines.stan")
 cat("Fitting model with:\n")
 cat("  - Number of knots:", stan_data$num_knots, "(n/2 rule)\n")
 cat("  - Prior scale:", round(adaptive_prior, 2), "(based on data variance)\n")
-cat("  - Smoothing strength:", stan_data$smoothing_strength, " (2.0 is default)\n")
+cat("  - Smoothing strength:", stan_data$smoothing_strength, " (1.0 is default)\n")
 
 fit <- model$sample(
   data = stan_data,

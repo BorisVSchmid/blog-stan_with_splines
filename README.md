@@ -175,7 +175,7 @@ source("examples/run_regional_splines.R")   # Regional hierarchical models
 # Modeling epidemic curves with potential sharp features
 epidemic_fit <- fit_bspline(outbreak_data, 
                            num_knots = 15,        # More knots for flexibility
-                           smoothing_strength = 2)  # Control wiggliness
+                           smoothing_strength = 1)  # Default smoothing
 
 # Regional models with local variation
 regional_model <- stan("regional_splines.stan", 

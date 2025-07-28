@@ -21,15 +21,25 @@ x <- seq(0, 10, length.out = n)
 y_true <- sin(x)
 y <- y_true + rnorm(n, 0, 0.1)
 
+# Calculate default knot counts
+# B-splines: n/2 knots (capped at 40)
+# C-splines: n/4 knots (capped at 20)
+bspline_knots <- max(4, min(round(n/2), 40))
+cspline_knots <- max(4, min(round(n/4), 20))
+
+cat(sprintf("Using default adaptive knot selection:\n"))
+cat(sprintf("  B-splines: %d knots (n/2 rule)\n", bspline_knots))
+cat(sprintf("  C-splines: %d knots (n/4 rule)\n\n", cspline_knots))
+
 # Test B-spline
 cat("Testing B-spline model...\n")
 stan_data_b <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 5,
+  num_knots = bspline_knots,
   spline_degree = 3,
-  smoothing_strength = 0.0, # if we only do 5 knots, then do little to no smoothing.
+  smoothing_strength = 1.0, # Good default for sine waves with adaptive knots
   prior_scale = 2 * sd(y)
 )
 
@@ -55,7 +65,7 @@ stan_data_c <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 5
+  num_knots = cspline_knots
 )
 
 model_c <- cmdstan_model("code/csplines.stan")
@@ -147,7 +157,8 @@ combined_plot <- p_b + p_c
 combined_plot <- combined_plot + 
   plot_annotation(
     title = "Basic Spline Comparison: B-splines vs C-splines",
-    subtitle = "Both fitting sin(x) with 5 knots. Red dashed = true function, points = data",
+    subtitle = sprintf("Fitting sin(x) with default adaptive knots (B-splines: %d, C-splines: %d). Red dashed = true function, points = data", 
+                      bspline_knots, cspline_knots),
     theme = theme(plot.title = element_text(size = 14, face = "bold"))
   )
 

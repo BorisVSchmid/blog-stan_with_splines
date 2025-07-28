@@ -106,7 +106,7 @@ stan_data <- list(
   y = y,
   num_knots = 10,
   spline_degree = 3,
-  smoothing_strength = 2,
+  smoothing_strength = 1,
   prior_scale = 2 * sd(y)
 )
 

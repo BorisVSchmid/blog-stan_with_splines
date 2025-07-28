@@ -653,7 +653,7 @@ plot_diagnostic_residuals <- function(fit, x, y) {
     geom_point(alpha = 0.6) +
     geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
     labs(title = "Residuals vs Fitted", 
-         subtitle = "Check for heteroscedasticity",
+         subtitle = "Check for heteroscedasticity (changes in variance)",
          x = "Fitted values", y = "Residuals") +
     theme_bw()
   

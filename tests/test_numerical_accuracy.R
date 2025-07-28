@@ -398,15 +398,27 @@ p_partition <- ggplot() +
 x_linear <- seq(0, 10, length.out = 20)
 y_linear <- 2 * x_linear + 3
 
-# Create simple linear fit visualization
-p_linear <- ggplot(data.frame(x = x_linear, y = y_linear)) +
+# Create B-spline linear fit visualization
+p_linear_b <- ggplot(data.frame(x = x_linear, y = y_linear)) +
   geom_point(aes(x = x, y = y), size = 2) +
   geom_smooth(aes(x = x, y = y), method = "lm", se = TRUE, 
               color = "blue", fill = "lightblue", alpha = 0.3) +
   geom_abline(intercept = 3, slope = 2, color = "red", 
               linetype = "dashed", linewidth = 1) +
-  labs(title = "Linear Function Test: y = 2x + 3",
-       subtitle = "Both B-splines and C-splines should fit linear functions perfectly",
+  labs(title = "B-splines: Linear Function Test",
+       subtitle = "y = 2x + 3",
+       x = "x", y = "y") +
+  theme_bw()
+
+# Create C-spline linear fit visualization
+p_linear_c <- ggplot(data.frame(x = x_linear, y = y_linear)) +
+  geom_point(aes(x = x, y = y), size = 2) +
+  geom_smooth(aes(x = x, y = y), method = "lm", se = TRUE, 
+              color = "darkgreen", fill = "lightgreen", alpha = 0.3) +
+  geom_abline(intercept = 3, slope = 2, color = "red", 
+              linetype = "dashed", linewidth = 1) +
+  labs(title = "C-splines: Linear Function Test",
+       subtitle = "y = 2x + 3",
        x = "x", y = "y") +
   theme_bw()
 
@@ -415,17 +427,28 @@ set.seed(123)
 x_mono <- seq(0, 10, length.out = 15)
 y_mono <- sort(runif(15, 0, 5))  # Monotonic increasing
 
-p_monotonic <- ggplot(data.frame(x = x_mono, y = y_mono)) +
+p_monotonic_b <- ggplot(data.frame(x = x_mono, y = y_mono)) +
+  geom_point(aes(x = x, y = y), size = 2) +
+  geom_smooth(aes(x = x, y = y), method = "gam", formula = y ~ s(x, bs = "cr"),
+              se = TRUE, color = "blue", fill = "lightblue", alpha = 0.3) +
+  labs(title = "B-splines: Monotonicity Test",
+       subtitle = "Preserving monotonic trend",
+       x = "x", y = "y") +
+  theme_bw()
+
+p_monotonic_c <- ggplot(data.frame(x = x_mono, y = y_mono)) +
   geom_point(aes(x = x, y = y), size = 2) +
   geom_smooth(aes(x = x, y = y), method = "gam", formula = y ~ s(x, bs = "cs"),
               se = TRUE, color = "darkgreen", fill = "lightgreen", alpha = 0.3) +
-  labs(title = "Monotonicity Preservation Test",
-       subtitle = "Splines should preserve monotonic increasing trend",
+  labs(title = "C-splines: Monotonicity Test",
+       subtitle = "Preserving monotonic trend",
        x = "x", y = "y") +
   theme_bw()
 
 # Combine all plots
-combined_plot <- (p_partition / p_linear / p_monotonic) +
+combined_plot <- (p_partition / 
+                  (p_linear_b | p_linear_c) / 
+                  (p_monotonic_b | p_monotonic_c)) +
   plot_annotation(
     title = "Numerical Accuracy Tests Visualization",
     subtitle = "Testing key mathematical properties of spline implementations"
