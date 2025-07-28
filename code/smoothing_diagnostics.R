@@ -5,6 +5,8 @@
 # The suggested parameter adjustments are based on heuristics and may need
 # fine-tuning for your specific application. Always validate the results.
 
+# GUIDANCE SECTION FOR CLAUDE CODE:
+#
 # IMPORTANT: Diagnostic advice should be data-driven, not hard-coded
 #
 # WRONG - Hard-coded multipliers:
@@ -16,7 +18,9 @@
 #   "Set smoothing_strength > 0 (noise level suggests strength=20)"
 #
 # The advice should be calculated from the actual diagnostic metrics,
-# not predetermined constants.
+# not predetermined constants
+#.
+# END OF GUIDANCE SECTION.
 
 library(dplyr)
 
@@ -447,7 +451,7 @@ print_smoothing_diagnostics <- function(diagnosis) {
   }
   
   if (!is.na(diagnosis$smoothing_strength)) {
-    cat(sprintf("Smoothing strength: %.1f\n", diagnosis$smoothing_strength))
+    cat(sprintf("Smoothing strength: %.1f (2.0 is default)\n", diagnosis$smoothing_strength))
   }
   cat(sprintf("Estimated noise σ: %.3f\n", diagnosis$sigma_estimate))
   
@@ -469,7 +473,7 @@ print_smoothing_diagnostics <- function(diagnosis) {
   # Autocorrelation with interpretation
   autocor_level <- ifelse(diagnosis$residual_autocor > 0.3, "high", 
                           ifelse(diagnosis$residual_autocor > 0.2, "moderate", "low"))
-  cat(sprintf("Residual autocorrelation:      %5.3f (%s)        → Pattern in residuals (high = over-smoothed)\n", 
+  cat(sprintf("Residual autocorrelation:      %5.3f (%s)      → Pattern in residuals (high = over-smoothed)\n", 
               diagnosis$residual_autocor, autocor_level))
   
   runs_status <- ifelse(abs(diagnosis$runs_proportion - 0.5) < 0.1, "good",
@@ -486,7 +490,7 @@ print_smoothing_diagnostics <- function(diagnosis) {
                 diagnosis$smoothness))
   }
   
-  cat(sprintf("LOO RMSE:                      %5.3f             → Cross-validation error (lower = better)\n", 
+  cat(sprintf("LOO RMSE:                      %5.3f            → Cross-validation error (lower = better)\n", 
               diagnosis$loo_rmse))
   
   # EDF at the end with clear caveat

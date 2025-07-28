@@ -1,10 +1,14 @@
 # Test regional B-splines with hierarchical priors
 # Demonstrates fitting splines to multiple regions that share information
 
+# Suppress default graphics device to prevent Rplots.pdf
+pdf(NULL)
+
 library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::sd)
 
 library(groundhog)
 stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
@@ -261,3 +265,6 @@ cat("  mu_alpha:", round(min(ess[grep("mu_alpha", names(ess))]), 0), "-",
 cat("  tau_alpha:", round(min(ess[grep("tau_alpha", names(ess))]), 0), "-",
     round(max(ess[grep("tau_alpha", names(ess))]), 0), "\n")
 cat("  sigma:", round(ess["sigma"], 0), "\n")
+
+# Close the null device
+dev.off()

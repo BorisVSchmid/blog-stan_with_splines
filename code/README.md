@@ -72,8 +72,6 @@ Functions:
 - `print_smoothing_diagnostics()`: Pretty-print results
 - `fit_with_diagnostics()`: Wrapper for fitting with diagnostics
 
-### test_bsplines_boundary.stan
-Specialized B-spline model for testing boundary behavior and extrapolation.
 
 ## Usage Examples
 

@@ -1,14 +1,18 @@
 # Numerical accuracy tests for B-splines and C-splines
 # Tests known properties and analytical solutions in pure R
 
+# Suppress default graphics device to prevent Rplots.pdf
+pdf(NULL)
+
 library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::sd)  # Use base R sd, not posterior::sd
 
 library(groundhog)
 stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
-pkgs <- c("dplyr", "ggplot2")
+pkgs <- c("dplyr", "ggplot2", "patchwork")
 groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
 
 library(cmdstanr)
@@ -432,3 +436,6 @@ dir.create("output", showWarnings = FALSE)
 ggsave("output/test-numerical_accuracy_properties.png", combined_plot, 
        width = 8, height = 10, dpi = 300)
 cat("Saved numerical accuracy visualization to output/test-numerical_accuracy_properties.png\n")
+
+# Close the null device
+dev.off()

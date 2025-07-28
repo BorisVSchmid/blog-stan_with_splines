@@ -24,18 +24,23 @@ x <- seq(0, 10, length.out = n)
 y_true <- sin(x) + 0.4 * cos(3*x) + 0.25*x
 y <- y_true + rnorm(n, 0, 0.15)
 
+# Use n/4 knots for C-splines (they're naturally smoother than B-splines)
+adaptive_knots <- max(4, min(round(n/4), 20))
+
 # Prepare data for Stan
 stan_data <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 5       # Number of knots for natural cubic spline
-                      # - Use 4-6 knots for simple smooth curves
-                      # - Use 7-10 knots for more complex patterns
-                      # - C-splines are smoother than B-splines, so often need fewer knots
-                      # - Too many knots can lead to numerical instability
+  num_knots = adaptive_knots  # Use adaptive knot selection (n/4)
+                              # - C-splines are smoother than B-splines, so need fewer knots
+                              # - Too many knots can lead to numerical instability
 )
 # Note: C-splines will extrapolate linearly beyond the data range
+
+cat("Fitting model with:\n")
+cat("  - Number of knots:", stan_data$num_knots, "(n/4 rule)\n")
+cat("  - Sample size:", n, "\n")
 
 # Compile and fit model
 model <- cmdstan_model("code/csplines.stan")
@@ -57,6 +62,12 @@ print(fit$diagnostic_summary())
 cat("\n")
 diagnosis <- diagnose_smoothing(fit, x, y, stan_data, "cspline")
 print_smoothing_diagnostics(diagnosis)
+
+# Generate and save diagnostic plots
+cat("\nGenerating diagnostic plots...\n")
+diagnostic_plot <- plot_diagnostic_residuals(fit, x, y)
+ggsave("output/code-cspline_diagnostics.png", diagnostic_plot, width = 12, height = 8, dpi = 300)
+cat("Diagnostic plots saved to output/code-cspline_diagnostics.png\n")
 
 # Extract and plot results
 draws <- fit$draws(format = "matrix")

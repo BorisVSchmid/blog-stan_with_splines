@@ -8,13 +8,19 @@ Original source: https://github.com/milkha/Splines_in_Stan
 
 ### Major Additions and Enhancements
 
-1. **Scale-Invariant Smoothing (Major Addition)**
+1. **Scale-Invariant Smoothing with Inverted Parameter (Major Addition)**
    - **Original**: Used fixed `tau` parameter for random walk: `a[i] = a[i-1] + a_raw[i]*tau`
-   - **Our Implementation**: Automatically scales smoothing by data variance and number of basis functions:
+     - Larger `tau` = more flexibility (less smooth)
+   - **Our Implementation**: Inverted the relationship and made it scale-invariant:
      ```stan
      tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis);
      ```
+   - **Key innovation**: Higher `smoothing_strength` = MORE smoothing (smoother curves)
+     - `smoothing_strength = 0`: No smoothing (independent coefficients)
+     - `smoothing_strength = 1-2`: Mild smoothing
+     - `smoothing_strength = 5-10`: Strong smoothing
    - This ensures consistent smoothing behavior regardless of data scale or number of knots
+   - The inverted relationship is more intuitive: larger values mean more smoothing
 
 2. **Boundary Handling for Rightmost Data Point**
    - **Original**: Standard B-spline definition could miss the rightmost data point

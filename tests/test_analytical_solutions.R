@@ -1,15 +1,18 @@
 # Test splines against known analytical solutions
 # Tests specific cases where we know the expected behavior
 
+# Suppress default graphics device to prevent Rplots.pdf
+pdf(NULL)
+
 library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
-conflicts_prefer(stats::var)
+conflicts_prefer(stats::sd)  # Use base R sd, not posterior::sd
 
 library(groundhog)
 stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
-pkgs <- c("dplyr", "ggplot2")
+pkgs <- c("dplyr", "ggplot2", "patchwork")
 groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
 
 library(cmdstanr)
@@ -510,6 +513,9 @@ if (length(all_fits) > 0) {
          width = 10, height = 8, dpi = 300)
   cat("Saved analytical solutions plot to output/test-analytical_solutions.png\n")
 }
+
+# Close the null device at the end
+dev.off()
 
 # Summary
 cat("\n\nAnalytical Solutions Test Summary\n")

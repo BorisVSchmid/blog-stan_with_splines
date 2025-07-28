@@ -101,7 +101,14 @@ stan_data <- list(
 )
 
 # Check if fitted model exists
-model_cache_file <- "output/example-hierarchical_model_draws.rds"
+# Get the correct path whether run from project root or examples directory
+if (dir.exists("output")) {
+  model_cache_file <- "output/example-hierarchical_model_draws.rds"
+} else if (dir.exists("../output")) {
+  model_cache_file <- "../output/example-hierarchical_model_draws.rds"
+} else {
+  stop("Cannot find output directory")
+}
 
 if (file.exists(model_cache_file)) {
   cat("Loading cached model draws...\n")
@@ -118,7 +125,15 @@ if (file.exists(model_cache_file)) {
 } else {
   # Compile and fit model
   cat("Fitting hierarchical model (this may take a few minutes)...\n")
-  model <- cmdstan_model("examples/regional_splines.stan")
+  # Get the correct path whether run from project root or examples directory
+  if (file.exists("regional_splines.stan")) {
+    stan_file <- "regional_splines.stan"
+  } else if (file.exists("examples/regional_splines.stan")) {
+    stan_file <- "examples/regional_splines.stan"
+  } else {
+    stop("Cannot find regional_splines.stan file")
+  }
+  model <- cmdstan_model(stan_file)
   
   fit <- model$sample(
     data = stan_data,
@@ -141,7 +156,7 @@ if (file.exists(model_cache_file)) {
   draws <- fit$draws(format = "matrix")
   
   # Save draws and diagnostics for future runs
-  cat("Saving model draws for future runs...\n")
+  cat("Saving model draws for future runs... Takes a while.\n")
   cache_data <- list(
     draws = draws,
     diagnostics = list(
@@ -313,7 +328,13 @@ combined_plot <- p_global / p_regional / p_fits +
     subtitle = "How well does the model separate global patterns from regional variations?"
   )
 
-ggsave("output/example-hierarchical_decomposition.png", combined_plot, width = 10, height = 12, dpi = 300)
+# Save to the correct output directory
+output_file <- if (dir.exists("output")) {
+  "output/example-hierarchical_decomposition.png"
+} else {
+  "../output/example-hierarchical_decomposition.png"
+}
+ggsave(output_file, combined_plot, width = 10, height = 12, dpi = 300)
 
 # Calculate recovery metrics
 cat("\n======================================\n")

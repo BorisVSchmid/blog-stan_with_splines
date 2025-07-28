@@ -1,5 +1,18 @@
 # Quick test of spline implementations
+
+library(conflicted)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::lag)
+conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::sd)  # Use base R sd, not posterior::sd
+
+library(groundhog)
+stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
+pkgs <- c("dplyr", "ggplot2", "patchwork")
+groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
+
 library(cmdstanr)
+
 set.seed(123)
 
 # Generate simple test data

@@ -1,6 +1,9 @@
 # Comprehensive test script for B-splines and C-splines in Stan
 # Tests both implementations with various functions and edge cases
 
+# Suppress default graphics device to prevent Rplots.pdf
+pdf(NULL)
+
 # Package management
 library(conflicted)
 conflicts_prefer(dplyr::filter)
@@ -472,3 +475,6 @@ cat("Results saved to output/ directory:\n")
 cat("  - test-spline_comparison.png: Main comparison plots\n")
 cat("  - test-bspline_basis_functions.png: B-spline basis visualization\n")
 cat("  - test-bspline_degree_comparison.png: Effect of spline degree\n")
+
+# Close the null device
+dev.off()

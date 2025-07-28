@@ -59,7 +59,7 @@ model <- cmdstan_model("code/bsplines.stan")
 cat("Fitting model with:\n")
 cat("  - Number of knots:", stan_data$num_knots, "(n/2 rule)\n")
 cat("  - Prior scale:", round(adaptive_prior, 2), "(based on data variance)\n")
-cat("  - Smoothing strength:", stan_data$smoothing_strength, "\n")
+cat("  - Smoothing strength:", stan_data$smoothing_strength, " (2.0 is default)\n")
 
 fit <- model$sample(
   data = stan_data,
@@ -78,6 +78,12 @@ print(fit$diagnostic_summary())
 cat("\n")
 diagnosis <- diagnose_smoothing(fit, x, y, stan_data, "bspline")
 print_smoothing_diagnostics(diagnosis)
+
+# Generate and save diagnostic plots
+cat("\nGenerating diagnostic plots...\n")
+diagnostic_plot <- plot_diagnostic_residuals(fit, x, y)
+ggsave("output/code-bspline_diagnostics.png", diagnostic_plot, width = 12, height = 8, dpi = 300)
+cat("Diagnostic plots saved to output/code-bspline_diagnostics.png\n")
 
 # Extract and plot results
 draws <- fit$draws(format = "matrix")

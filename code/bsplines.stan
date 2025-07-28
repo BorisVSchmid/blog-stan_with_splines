@@ -1,9 +1,14 @@
 // B-splines with scale-invariant random walk smoothing prior
 // 
-// Key feature: The smoothing strength parameter works consistently across different data scales.
-// A smoothing_strength of 4.0 provides the same level of regularization whether your data
-// ranges from -1 to 1 or -1000 to 1000. This is achieved by scaling the random walk step
-// size by the data's standard deviation.
+// Key changes from standard implementations:
+// 1. Inverted smoothing parameter: Higher smoothing_strength = MORE smoothing (smoother curves)
+//    In typical implementations, larger tau = more flexibility. Here, we use tau = 1/sqrt(smoothing_strength)
+//    so that smoothing_strength=0 means no smoothing, and larger values increase smoothing.
+// 2. Scale-invariant: Smoothing behavior is independent of data scale (y values range)
+//    A smoothing_strength of 4.0 provides the same smoothness whether y ranges from -1 to 1 or -1000 to 1000
+// 3. Knot-count invariant: Smoothing behavior is consistent regardless of number of knots
+//    The same smoothing_strength produces similar smoothness with 5 knots or 20 knots
+
 functions {
   vector build_b_spline(array[] real t, array[] real ext_knots, int ind, int order, int degree) {
     vector[size(t)] b_spline;
@@ -41,7 +46,7 @@ data {
   int<lower=1> num_knots;
   int<lower=1> spline_degree;
   real<lower=0> smoothing_strength;  // Smoothing strength (0=none, 1-2=mild, 5-10=strong)
-  real<lower=0> prior_scale;  // Scale for coefficient priors
+  real<lower=0> prior_scale;         // Scale for coefficient priors
 }
 
 transformed data {
@@ -56,18 +61,12 @@ transformed data {
   array[2*spline_degree + num_knots] real ext_knots_arr;
   matrix[num_basis, n_data] B;
   
-  // Transform smoothing_strength to tau_smooth (random walk SD)
-  // smoothing_strength: 0=none, 1-2=mild, 5-10=strong (scales with num_basis)
-  // tau_smooth: 0=special case for independent, small=smooth, large=flexible
-  //
-  // CRITICAL: Scale-invariant smoothing implementation
+  // Scale-invariant smoothing implementation
   // The random walk prior is: alpha[i] = alpha[i-1] + alpha_raw[i] * tau_smooth
   // To make smoothing strength consistent across different data scales AND different
   // numbers of knots, we scale tau_smooth by both prior_scale (data variance) and
   // number of basis functions.
-  // Without this scaling, the same smoothing_strength would:
-  // 1. Underfit large-scale data while overfitting small-scale data
-  // 2. Have different effects with different numbers of knots
+  
   real tau_smooth;
   if (smoothing_strength == 0) {
     tau_smooth = 0;  // Special case: triggers independent coefficients
@@ -106,7 +105,7 @@ transformed data {
 }
 
 parameters {
-  real alpha_0;  // Intercept
+  real alpha_0;                 // Intercept
   vector[num_basis] alpha_raw;  // Raw coefficients for non-centered parameterization
   real<lower=0> sigma;
 }

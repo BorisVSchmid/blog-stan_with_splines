@@ -1,5 +1,8 @@
 # Test smoothing diagnostics with both B-splines and C-splines
 
+# Suppress default graphics device to prevent Rplots.pdf
+pdf(NULL)
+
 library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
@@ -8,7 +11,7 @@ conflicts_prefer(stats::sd)
 
 library(groundhog)
 stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
-pkgs <- c("dplyr", "ggplot2")
+pkgs <- c("dplyr", "ggplot2", "patchwork")
 groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
 
 library(cmdstanr)
@@ -288,3 +291,6 @@ cat("C-splines only have:\n")
 cat("  - num_knots control\n")
 cat("  - Natural boundary conditions (built-in)\n\n")
 cat("The diagnostics now provide appropriate advice for each spline type.\n")
+
+# Close the null device
+dev.off()
