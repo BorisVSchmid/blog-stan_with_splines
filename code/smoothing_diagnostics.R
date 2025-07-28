@@ -252,27 +252,43 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
           )
         }
       } else {
-        # Can potentially add more knots
+        # Few knots - recommend using adaptive knot selection with smoothing
         min_knots <- max(4, min(round(n/2), 40))
         
-        if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 5) {
-          suggested_strength <- max(2, diagnosis$smoothing_strength / 2)
+        if (diagnosis$num_knots < 5) {
+          # Very few knots - recommend B-spline best practice
           suggestions <- c(suggestions,
-            sprintf("  - Reduce smoothing_strength to %.0f (current: %.1f)",
-                    suggested_strength, diagnosis$smoothing_strength)
-          )
-        } else if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
-          suggestions <- c(suggestions,
-            sprintf("  - Reduce smoothing_strength (current: %.1f) or set to 0 for no smoothing",
+            sprintf("  - Use adaptive knot selection: increase num_knots to %d (current: %d)", 
+                    min_knots, diagnosis$num_knots),
+            "  - B-splines work best with many knots + smoothing, not few knots + no smoothing",
+            sprintf("  - Keep smoothing_strength = %.1f to control flexibility after adding knots",
                     diagnosis$smoothing_strength)
           )
-        }
-        
-        if (diagnosis$num_knots < min_knots) {
-          suggestions <- c(suggestions,
-            sprintf("  - Increase num_knots to %d (current: %d) for more flexibility", 
-                    min_knots, diagnosis$num_knots)
-          )
+        } else if (diagnosis$num_knots < min_knots) {
+          # Moderate number of knots but still below recommended
+          if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 5) {
+            suggested_strength <- max(2, diagnosis$smoothing_strength / 2)
+            suggestions <- c(suggestions,
+              sprintf("  - Either reduce smoothing_strength to %.0f (current: %.1f)",
+                      suggested_strength, diagnosis$smoothing_strength),
+              sprintf("  - OR increase num_knots to %d for better flexibility", min_knots)
+            )
+          } else {
+            suggestions <- c(suggestions,
+              sprintf("  - Increase num_knots to %d (current: %d) for more flexibility", 
+                      min_knots, diagnosis$num_knots),
+              sprintf("  - OR reduce smoothing_strength (current: %.1f)",
+                      diagnosis$smoothing_strength)
+            )
+          }
+        } else {
+          # Adequate knots but still over-smoothed
+          if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
+            suggestions <- c(suggestions,
+              sprintf("  - Reduce smoothing_strength (current: %.1f) or set to 0 for no smoothing",
+                      diagnosis$smoothing_strength)
+            )
+          }
         }
       }
     } else {

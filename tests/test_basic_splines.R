@@ -104,6 +104,20 @@ df_b <- data.frame(
   ymax = y_plot_b_upper
 )
 
+# Create C-spline plot
+df_c <- data.frame(
+  x = x_plot_c,
+  y = y_plot_c,
+  ymin = y_plot_c_lower,
+  ymax = y_plot_c_upper
+)
+
+# Calculate common y-axis limits
+y_min <- min(c(df_b$ymin, df_c$ymin, y, y_true))
+y_max <- max(c(df_b$ymax, df_c$ymax, y, y_true))
+y_range <- y_max - y_min
+y_limits <- c(y_min - 0.05 * y_range, y_max + 0.05 * y_range)
+
 p_b <- ggplot() +
   geom_ribbon(data = df_b, aes(x = x, ymin = ymin, ymax = ymax), alpha = 0.3, fill = "blue") +
   geom_line(data = df_b, aes(x = x, y = y), color = "blue", linewidth = 1.2) +
@@ -113,15 +127,8 @@ p_b <- ggplot() +
   labs(title = "B-spline Fit", 
        subtitle = paste0(stan_data_b$num_knots, " knots, smoothing = ", stan_data_b$smoothing_strength),
        x = "x", y = "y") +
-  theme_bw()
-
-# Create C-spline plot
-df_c <- data.frame(
-  x = x_plot_c,
-  y = y_plot_c,
-  ymin = y_plot_c_lower,
-  ymax = y_plot_c_upper
-)
+  theme_bw() +
+  ylim(y_limits)
 
 p_c <- ggplot() +
   geom_ribbon(data = df_c, aes(x = x, ymin = ymin, ymax = ymax), alpha = 0.3, fill = "darkgreen") +
@@ -132,10 +139,11 @@ p_c <- ggplot() +
   labs(title = "C-spline Fit", 
        subtitle = paste0(stan_data_c$num_knots, " knots"),
        x = "x", y = "y") +
-  theme_bw()
+  theme_bw() +
+  ylim(y_limits)
 
 # Combine plots
-combined_plot <- p_b | p_c
+combined_plot <- p_b + p_c
 combined_plot <- combined_plot + 
   plot_annotation(
     title = "Basic Spline Comparison: B-splines vs C-splines",
