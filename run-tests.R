@@ -17,7 +17,8 @@ test_order <- c(
   "test_edge_cases_minimal_knots.R",
   "test_numerical_accuracy.R",
   "test_analytical_solutions.R",
-  "test_sine_wave_smoothing.R"
+  "test_sine_wave_smoothing.R",
+  "test_diagnostic_recommendations.R"
 )
 
 # Reorder based on preferred order if files exist
@@ -36,7 +37,7 @@ remaining_tests <- setdiff(all_test_files, ordered_tests)
 all_tests <- c(ordered_tests, remaining_tests)
 
 # Debug: Check test count
-expected_tests <- 5  # Current number of tests
+expected_tests <- 6  # Current number of tests
 if (length(all_tests) != expected_tests) {
   cat("WARNING: Expected", expected_tests, "tests but found", length(all_tests), "\n")
   cat("Missing tests might include:", paste(setdiff(test_order, basename(all_tests)), collapse = ", "), "\n")
@@ -51,7 +52,8 @@ test_descriptions <- list(
   "test_edge_cases_minimal_knots.R" = "Edge cases with minimal knots (2-3 knots) for both spline types",
   "test_numerical_accuracy.R" = "Numerical properties (partition of unity, monotonicity)",
   "test_analytical_solutions.R" = "Known analytical solutions (polynomials, constants, sine)",
-  "test_sine_wave_smoothing.R" = "B-spline smoothing effects on sine waves with varying parameters"
+  "test_sine_wave_smoothing.R" = "B-spline smoothing effects on sine waves with varying parameters",
+  "test_diagnostic_recommendations.R" = "Smoothing diagnostic recommendations and parameter tuning"
 )
 
 # Track results
@@ -266,7 +268,7 @@ cat("\n\nTest Categories:\n")
 cat(rep("-", 140), "\n", sep = "")
 cat("Core functionality:  test_basic_splines.R, test_edge_cases_minimal_knots.R\n")
 cat("Mathematical tests:  test_numerical_accuracy.R, test_analytical_solutions.R\n")
-cat("Parameter tests:     test_sine_wave_smoothing.R\n")
+cat("Parameter tests:     test_sine_wave_smoothing.R, test_diagnostic_recommendations.R\n")
 
 # Final status
 cat("\n", rep("=", 60), "\n", sep = "")

@@ -31,15 +31,15 @@ generate_regional_data <- function(n_per_region = 40) {
   # Combined global pattern
   global_pattern <- global_trend + seasonality
   
-  # 3. Region-specific deviations (smaller to emphasize shared pattern)
-  # Region A: Small early peak
-  regional_effect_A <- 0.3 * exp(-0.5 * (x - 2.5)^2) - 0.1
+  # 3. Region-specific deviations (comparable amplitude to global pattern)
+  # Region A: Strong early peak
+  regional_effect_A <- 1.2 * exp(-0.5 * (x - 2.5)^2) - 0.3
   
-  # Region B: Small phase shift
-  regional_effect_B <- 0.2 * sin(2 * pi * (x + 0.5) / 3.5) - 0.05
+  # Region B: Strong phase shift
+  regional_effect_B <- 0.7 * sin(2 * pi * (x + 0.5) / 3.5) - 0.1
   
-  # Region C: Small amplitude modulation
-  regional_effect_C <- 0.15 * (1 + 0.1 * x) * sin(2 * pi * x / 3.5) + 0.1
+  # Region C: Strong amplitude modulation
+  regional_effect_C <- 0.6 * (1 + 0.1 * x) * sin(2 * pi * x / 3.5) + 0.2
   
   # Total effects
   y1_true <- global_pattern + regional_effect_A
@@ -94,9 +94,10 @@ stan_data <- list(
   x = data$x,
   y = data$y,
   region = data$region,
-  num_knots = max(4, min(round(n_per_region/2), 40)),  # n/2 rule
+  num_knots = max(4, min(round(n_per_region), 80)),  # Doubled: n rule instead of n/2
   spline_degree = 3,
-  smoothing_strength = 0.1,      # Default mild smoothing
+  smoothing_strength_global = 0.01,    # Reduced smoothing for more flexibility
+  smoothing_strength_regional = 0.01,  # Reduced smoothing for more flexibility
   prior_scale = 2 * sd(data$y)  # Adaptive prior scale
 )
 
@@ -143,8 +144,8 @@ if (file.exists(model_cache_file)) {
     iter_sampling = 5000,
     refresh = 0,
     seed = 123,
-    adapt_delta = 0.995,
-    max_treedepth = 12
+    adapt_delta = 0.999,
+    max_treedepth = 15
   )
   
   # Print diagnostic summary
@@ -177,8 +178,19 @@ dir.create("output", showWarnings = FALSE)
 
 # Extract global pattern from the model
 # The global pattern is mu_alpha * B + mu_beta
-mu_alpha_cols <- grep("mu_alpha\\[", colnames(draws), value = TRUE)
-mu_alpha_mean <- colMeans(draws[, mu_alpha_cols])
+# mu_alpha is stored as a row vector, so we need to extract columns like mu_alpha.1, mu_alpha.2, etc.
+mu_alpha_cols <- grep("^mu_alpha\\.", colnames(draws), value = TRUE)
+if (length(mu_alpha_cols) == 0) {
+  # Try alternative format
+  mu_alpha_cols <- grep("^mu_alpha\\[", colnames(draws), value = TRUE)
+}
+if (length(mu_alpha_cols) == 0) {
+  # Debug: print column names to understand the format
+  cat("\nDEBUG: First 50 column names in draws:\n")
+  cat(paste(head(colnames(draws), 50), collapse = ", "), "\n\n")
+  stop("Cannot find mu_alpha columns in draws")
+}
+mu_alpha_mean <- colMeans(draws[, mu_alpha_cols, drop = FALSE])
 mu_beta <- mean(draws[, "mu_beta"])
 
 # Build basis matrix for plotting
@@ -236,61 +248,110 @@ for (i in 1:num_basis) {
   B_plot[, i] <- build_b_spline(x_plot, ext_knots, i, stan_data$spline_degree + 1, stan_data$spline_degree)
 }
 
-# Compute recovered global pattern
+# Compute recovered global pattern with uncertainty
 # B_plot is n_plot × num_basis, mu_alpha_mean is num_basis × 1
-recovered_global <- as.numeric(B_plot %*% mu_alpha_mean) + mu_beta
+# Extract all mu_alpha samples to compute credible intervals
+mu_alpha_samples <- draws[, mu_alpha_cols, drop = FALSE]
+mu_beta_samples <- draws[, "mu_beta"]
+
+# Compute global pattern for each MCMC sample
+global_pattern_samples <- matrix(0, nrow(draws), length(x_plot))
+for (i in 1:nrow(draws)) {
+  global_pattern_samples[i,] <- as.numeric(B_plot %*% as.numeric(mu_alpha_samples[i,])) + mu_beta_samples[i]
+}
+
+# Get mean and credible intervals
+recovered_global <- colMeans(global_pattern_samples)
+recovered_global_lower <- apply(global_pattern_samples, 2, quantile, 0.025)
+recovered_global_upper <- apply(global_pattern_samples, 2, quantile, 0.975)
 
 # Extract regional deviations
 # For each region: (alpha[r] - mu_alpha) * B + (beta[r] - mu_beta)
 regional_deviations <- list()
 for (r in 1:3) {
-  alpha_cols <- grep(paste0("alpha\\[", r, ","), colnames(draws), value = TRUE, fixed = TRUE)
-  alpha_r_mean <- colMeans(draws[, alpha_cols])
-  beta_r <- mean(draws[, paste0("beta_region[", r, "]")])
+  # Alpha_deviation is stored as alpha_deviation[r,j] where r is region and j is basis function
+  # The grep needs to escape the brackets and comma properly
+  alpha_deviation_cols <- grep(paste0("^alpha_deviation\\[", r, ","), colnames(draws), value = TRUE)
+  if (length(alpha_deviation_cols) == 0) {
+    # Try alternative format with dots
+    alpha_deviation_cols <- grep(paste0("^alpha_deviation\\.", r, "\\."), colnames(draws), value = TRUE)
+  }
+  if (length(alpha_deviation_cols) == 0) {
+    # Debug: print column names to understand the format
+    cat(paste0("\nDEBUG: Cannot find alpha_deviation columns for region ", r, "\n"))
+    cat("Looking for pattern: alpha_deviation[", r, ",j] or alpha_deviation.", r, ".j\n")
+    alpha_dev_like <- grep("^alpha_deviation", colnames(draws), value = TRUE)
+    cat("First 20 alpha_deviation columns: ", paste(head(alpha_dev_like, 20), collapse = ", "), "\n\n")
+    stop("Cannot find alpha_deviation columns for region ", r)
+  }
+  # Get all samples for this region's deviations
+  alpha_deviation_r_samples <- draws[, alpha_deviation_cols, drop = FALSE]
+  beta_r_samples <- draws[, paste0("beta_region[", r, "]")]
   
-  deviation <- as.numeric(B_plot %*% (alpha_r_mean - mu_alpha_mean)) + (beta_r - mu_beta)
-  regional_deviations[[r]] <- deviation
+  # Compute deviation for each MCMC sample
+  deviation_samples <- matrix(0, nrow(draws), length(x_plot))
+  for (i in 1:nrow(draws)) {
+    deviation_samples[i,] <- as.numeric(B_plot %*% as.numeric(alpha_deviation_r_samples[i,])) + 
+                             (beta_r_samples[i] - mu_beta_samples[i])
+  }
+  
+  # Get mean and credible intervals
+  deviation_mean <- colMeans(deviation_samples)
+  deviation_lower <- apply(deviation_samples, 2, quantile, 0.025)
+  deviation_upper <- apply(deviation_samples, 2, quantile, 0.975)
+  
+  regional_deviations[[r]] <- list(
+    mean = deviation_mean,
+    lower = deviation_lower,
+    upper = deviation_upper
+  )
 }
 
 # Create comparison plots
-# 1. Global pattern recovery
+# 1. Global pattern recovery with confidence interval
 df_global <- data.frame(
-  x = rep(x_plot, 2),
-  y = c(truth$global_pattern, recovered_global),
-  type = factor(rep(c("True", "Recovered"), each = length(x_plot)))
+  x = x_plot,
+  y_true = truth$global_pattern,
+  y_recovered = recovered_global,
+  y_lower = recovered_global_lower,
+  y_upper = recovered_global_upper
 )
 
-p_global <- ggplot(df_global, aes(x = x, y = y, color = type, linetype = type)) +
-  geom_line(linewidth = 1.2) +
-  scale_color_manual(values = c("True" = "black", "Recovered" = "blue")) +
-  scale_linetype_manual(values = c("True" = "dashed", "Recovered" = "solid")) +
+p_global <- ggplot(df_global, aes(x = x)) +
+  geom_ribbon(aes(ymin = y_lower, ymax = y_upper), fill = "blue", alpha = 0.3) +
+  geom_line(aes(y = y_true), color = "black", linetype = "dashed", linewidth = 1.2) +
+  geom_line(aes(y = y_recovered), color = "blue", linewidth = 1.2) +
   labs(title = "Global Pattern Recovery",
-       subtitle = "Shared trend and seasonality across all regions",
+       subtitle = "Shared trend and seasonality across all regions (shaded: 95% CI)",
        x = "x", y = "y") +
-  theme_bw() +
-  theme(legend.title = element_blank())
+  theme_bw()
 
-# 2. Regional deviations recovery
+# 2. Regional deviations recovery with confidence intervals
 df_regional <- data.frame(
-  x = rep(x_plot, 6),
-  y = c(truth$regional_effects$A, regional_deviations[[1]],
-        truth$regional_effects$B, regional_deviations[[2]], 
-        truth$regional_effects$C, regional_deviations[[3]]),
-  type = factor(rep(c("True", "Recovered"), 3, each = length(x_plot))),
-  region = factor(rep(c("Region A", "Region B", "Region C"), each = 2*length(x_plot)))
+  x = rep(x_plot, 3),
+  y_true = c(truth$regional_effects$A, truth$regional_effects$B, truth$regional_effects$C),
+  y_recovered = c(regional_deviations[[1]]$mean, 
+                  regional_deviations[[2]]$mean, 
+                  regional_deviations[[3]]$mean),
+  y_lower = c(regional_deviations[[1]]$lower,
+              regional_deviations[[2]]$lower,
+              regional_deviations[[3]]$lower),
+  y_upper = c(regional_deviations[[1]]$upper,
+              regional_deviations[[2]]$upper,
+              regional_deviations[[3]]$upper),
+  region = factor(rep(c("Region A", "Region B", "Region C"), each = length(x_plot)))
 )
 
-p_regional <- ggplot(df_regional, aes(x = x, y = y, color = type, linetype = type)) +
-  geom_line(linewidth = 1) +
+p_regional <- ggplot(df_regional, aes(x = x)) +
+  geom_ribbon(aes(ymin = y_lower, ymax = y_upper), fill = "red", alpha = 0.3) +
   geom_hline(yintercept = 0, alpha = 0.3) +
+  geom_line(aes(y = y_true), color = "black", linetype = "dashed", linewidth = 1) +
+  geom_line(aes(y = y_recovered), color = "red", linewidth = 1) +
   facet_wrap(~ region, scales = "free_y") +
-  scale_color_manual(values = c("True" = "black", "Recovered" = "red")) +
-  scale_linetype_manual(values = c("True" = "dashed", "Recovered" = "solid")) +
   labs(title = "Regional Deviations Recovery",
-       subtitle = "Region-specific patterns after removing global component",
+       subtitle = "Region-specific patterns with 95% CI (dashed: true, solid: recovered)",
        x = "x", y = "Deviation from global") +
-  theme_bw() +
-  theme(legend.title = element_blank())
+  theme_bw()
 
 # 3. Overall fit per region
 y_hat_cols <- grep("y_hat\\[", colnames(draws), value = TRUE)
@@ -307,12 +368,12 @@ data$y_true <- c(truth$total_effects$A, truth$total_effects$B, truth$total_effec
 
 p_fits <- ggplot(data, aes(x = x)) +
   geom_ribbon(aes(ymin = y_lower, ymax = y_upper, fill = region_name), alpha = 0.3) +
-  geom_point(aes(y = y, color = region_name), alpha = 0.5, size = 1) +
+  geom_line(aes(y = y_true, color = region_name), linetype = "dashed", linewidth = 1) +
+  geom_point(aes(y = y, color = region_name), alpha = 0.7, size = 1.5) +
   geom_line(aes(y = y_fitted, color = region_name), linewidth = 1) +
-  geom_line(aes(y = y_true), linetype = "dashed", alpha = 0.7) +
   facet_wrap(~ region_name, scales = "free_y") +
   labs(title = "Overall Fit Quality",
-       subtitle = "Points: data, Solid: fitted, Dashed: true function, Shaded: 95% CI",
+       subtitle = "Points: data (matching color), Solid: fitted, Dashed: true function, Shaded: 95% CI",
        x = "x", y = "y") +
   theme_bw() +
   theme(legend.position = "none") +
@@ -352,7 +413,7 @@ cat(sprintf("  Correlation: %.4f\n", global_cor))
 cat("\nRegional deviations recovery:\n")
 for (i in 1:3) {
   true_dev <- switch(i, truth$regional_effects$A, truth$regional_effects$B, truth$regional_effects$C)
-  recovered_dev <- regional_deviations[[i]]
+  recovered_dev <- regional_deviations[[i]]$mean
   rmse <- sqrt(mean((true_dev - recovered_dev)^2))
   cor_val <- cor(true_dev, recovered_dev)
   cat(sprintf("  Region %s - RMSE: %.4f, Correlation: %.4f\n", 
@@ -382,3 +443,163 @@ if (exists("diagnostics")) {
 }
 
 cat("\nOutput saved: output/example-hierarchical_decomposition.png\n")
+
+# Create diagnostic report for the splines
+cat("\nGenerating spline diagnostics report...\n")
+
+# Compute residuals for each spline
+compute_spline_diagnostics <- function(y_true, y_fitted, label) {
+  residuals <- y_true - y_fitted
+  n <- length(residuals)
+  
+  # Autocorrelation at different lags
+  acf_vals <- acf(residuals, lag.max = 5, plot = FALSE)$acf[-1]  # Remove lag 0
+  
+  # Smoothness metrics
+  first_diff <- diff(y_fitted)
+  second_diff <- diff(first_diff)
+  roughness <- sqrt(mean(second_diff^2))
+  
+  # Residual statistics
+  rmse <- sqrt(mean(residuals^2))
+  mae <- mean(abs(residuals))
+  
+  # Return diagnostics
+  data.frame(
+    spline = label,
+    rmse = rmse,
+    mae = mae,
+    roughness = roughness,
+    acf_lag1 = acf_vals[1],
+    acf_lag2 = acf_vals[2],
+    acf_lag3 = acf_vals[3],
+    acf_lag4 = acf_vals[4],
+    acf_lag5 = acf_vals[5],
+    mean_residual = mean(residuals),
+    sd_residual = sd(residuals),
+    min_residual = min(residuals),
+    max_residual = max(residuals)
+  )
+}
+
+# Collect diagnostics for all splines
+diagnostics_list <- list()
+
+# Global pattern diagnostics
+diag_global <- compute_spline_diagnostics(truth$global_pattern, recovered_global, "Global")
+diagnostics_list[[1]] <- diag_global
+
+# Regional deviation diagnostics
+for (i in 1:3) {
+  true_dev <- switch(i, truth$regional_effects$A, truth$regional_effects$B, truth$regional_effects$C)
+  recovered_dev <- regional_deviations[[i]]$mean
+  label <- paste("Region", c("A", "B", "C")[i], "Deviation")
+  diag_regional <- compute_spline_diagnostics(true_dev, recovered_dev, label)
+  diagnostics_list[[i + 1]] <- diag_regional
+}
+
+# Combine diagnostics
+diagnostics_df <- do.call(rbind, diagnostics_list)
+
+# Save to CSV
+csv_file <- if (dir.exists("output")) {
+  "output/example-hierarchical_spline_diagnostics.csv"
+} else {
+  "../output/example-hierarchical_spline_diagnostics.csv"
+}
+write.csv(diagnostics_df, csv_file, row.names = FALSE)
+cat("Spline diagnostics saved to:", csv_file, "\n")
+
+# Create diagnostic plots for all splines
+cat("\nGenerating diagnostic plots for all splines...\n")
+
+# Function to create diagnostic plots for a single spline
+create_spline_diagnostic_plots <- function(y_true, y_fitted, x_vals, spline_name) {
+  residuals <- y_true - y_fitted
+  
+  # 1. Fitted vs True
+  df_fit <- data.frame(x = x_vals, true = y_true, fitted = y_fitted)
+  p_fit <- ggplot(df_fit, aes(x = x)) +
+    geom_line(aes(y = true), color = "black", linetype = "dashed", linewidth = 1) +
+    geom_line(aes(y = fitted), color = "blue", linewidth = 1) +
+    labs(title = paste(spline_name, "- Fit"),
+         subtitle = "Dashed: True, Solid: Fitted",
+         x = "x", y = "y") +
+    theme_bw()
+  
+  # 2. Residuals vs x
+  df_resid <- data.frame(x = x_vals, residuals = residuals)
+  p_resid <- ggplot(df_resid, aes(x = x, y = residuals)) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+    geom_point(alpha = 0.6) +
+    geom_smooth(method = "loess", se = TRUE, color = "blue") +
+    labs(title = paste(spline_name, "- Residuals"),
+         subtitle = "Loess smooth with 95% CI",
+         x = "x", y = "Residuals") +
+    theme_bw()
+  
+  # 3. ACF plot
+  acf_data <- acf(residuals, lag.max = 20, plot = FALSE)
+  df_acf <- data.frame(lag = acf_data$lag[-1], acf = acf_data$acf[-1])
+  
+  # Calculate confidence bounds
+  n <- length(residuals)
+  conf_bound <- qnorm(0.975) / sqrt(n)
+  
+  p_acf <- ggplot(df_acf, aes(x = lag, y = acf)) +
+    geom_hline(yintercept = 0, color = "black") +
+    geom_hline(yintercept = c(-conf_bound, conf_bound), 
+               color = "blue", linetype = "dashed") +
+    geom_segment(aes(xend = lag, yend = 0), color = "black") +
+    geom_point(size = 2) +
+    labs(title = paste(spline_name, "- Autocorrelation"),
+         subtitle = "Blue dashed: 95% confidence bounds",
+         x = "Lag", y = "ACF") +
+    theme_bw()
+  
+  return(list(fit = p_fit, resid = p_resid, acf = p_acf))
+}
+
+# Create plots for each spline
+plot_list <- list()
+
+# 1. Global pattern
+plots_global <- create_spline_diagnostic_plots(
+  truth$global_pattern, recovered_global, x_plot, "Global Pattern"
+)
+plot_list[[1]] <- plots_global
+
+# 2. Regional deviations
+for (i in 1:3) {
+  true_dev <- switch(i, truth$regional_effects$A, 
+                     truth$regional_effects$B, 
+                     truth$regional_effects$C)
+  recovered_dev <- regional_deviations[[i]]$mean
+  label <- paste("Region", c("A", "B", "C")[i], "Deviation")
+  
+  plots_regional <- create_spline_diagnostic_plots(
+    true_dev, recovered_dev, x_plot, label
+  )
+  plot_list[[i + 1]] <- plots_regional
+}
+
+# Combine all plots into a single figure
+library(patchwork)
+combined_diagnostics <- 
+  (plot_list[[1]]$fit | plot_list[[1]]$resid | plot_list[[1]]$acf) /
+  (plot_list[[2]]$fit | plot_list[[2]]$resid | plot_list[[2]]$acf) /
+  (plot_list[[3]]$fit | plot_list[[3]]$resid | plot_list[[3]]$acf) /
+  (plot_list[[4]]$fit | plot_list[[4]]$resid | plot_list[[4]]$acf) +
+  plot_annotation(
+    title = "Hierarchical Spline Diagnostics",
+    subtitle = "Fit quality, residual patterns, and autocorrelation for all components"
+  )
+
+# Save diagnostic plots
+diag_plot_file <- if (dir.exists("output")) {
+  "output/example-hierarchical_spline_diagnostics.png"
+} else {
+  "../output/example-hierarchical_spline_diagnostics.png"
+}
+ggsave(diag_plot_file, combined_diagnostics, width = 15, height = 16, dpi = 300)
+cat("Diagnostic plots saved to:", diag_plot_file, "\n")

@@ -4,6 +4,7 @@ library(conflicted)
 conflicts_prefer(dplyr::filter)
 conflicts_prefer(dplyr::lag)
 conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::sd)
 
 library(groundhog)
 # Use groundhog for dependencies
@@ -127,9 +128,6 @@ p <- ggplot() +
         legend.position = "bottom",
         legend.title = element_blank()) +
   guides(fill = guide_legend(order = 2), color = guide_legend(order = 1))
-
-# Display the plot
-print(p)
 
 # Save the plot
 dir.create("output", showWarnings = FALSE)

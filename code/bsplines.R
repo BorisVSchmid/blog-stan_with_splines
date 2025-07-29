@@ -25,7 +25,7 @@ source("code/smoothing_diagnostics.R")
 
 # Generate test data with complex function
 set.seed(123)
-n <- 40
+n <- 30
 x <- seq(0, 10, length.out = n)
 y_true <- sin(x) + 0.4 * cos(3*x) + 0.25*x 
 y <- y_true + rnorm(n, 0, 0.15)
@@ -144,9 +144,6 @@ p <- ggplot() +
         legend.position = "bottom",
         legend.title = element_blank()) +
   guides(fill = guide_legend(order = 2), color = guide_legend(order = 1))
-
-# Display the plot
-print(p)
 
 # Save the plot
 dir.create("output", showWarnings = FALSE)

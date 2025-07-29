@@ -102,6 +102,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   
   # Diagnose smoothing level
   diagnosis <- list(
+    model_type = model_type,
     edf = edf,
     sigma_estimate = sigma,
     residual_sd = residual_sd,
@@ -133,8 +134,9 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   edf_ratio <- edf / max_edf
   high_edf <- edf_ratio > 0.9  # Using >90% of available parameters
   low_edf <- edf_ratio < 0.3   # Using <30% of available parameters
-  high_autocor <- residual_autocor > 0.3
-  moderate_autocor <- residual_autocor > 0.2
+  high_autocor <- abs(residual_autocor) > 0.3
+  moderate_autocor <- abs(residual_autocor) > 0.2
+  negative_autocor <- residual_autocor < -0.2
   few_runs <- runs_test < 0.3
   high_smoothness <- !is.na(smoothness) && smoothness > 2 * residual_sd
   
@@ -150,21 +152,36 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
   # Determine smoothing state
   # High autocorrelation with many parameters might indicate model misspecification
   if (high_edf && high_autocor) {
-    warnings <- c(warnings, 
-      "High autocorrelation despite many parameters suggests possible model misspecification",
-      "The function may have features that the current spline configuration cannot capture")
+    # Check if it's a B-spline with smoothing information
+    if (model_type == "bspline" && !is.na(diagnosis$smoothing_strength)) {
+      if (diagnosis$smoothing_strength < 0.05) {
+        warnings <- c(warnings, 
+          "High autocorrelation despite low smoothing suggests possible model misspecification",
+          "The function may have features that the current spline configuration cannot capture")
+      } else {
+        over_smoothed <- TRUE
+        warnings <- c(warnings, 
+          "High autocorrelation with mild smoothing suggests over-smoothing")
+      }
+    } else {
+      # C-spline or B-spline without smoothing info
+      warnings <- c(warnings, 
+        "High autocorrelation despite many parameters suggests possible model misspecification",
+        "The function may have features that the current spline configuration cannot capture")
+    }
     # Don't give contradictory advice in this case
-  } else if (high_autocor || few_runs || low_edf) {
+  } else if ((high_autocor && residual_autocor > 0) || few_runs || low_edf) {
     # Classic over-smoothing (too smooth, not flexible enough)
     over_smoothed <- TRUE
-    if (high_autocor) warnings <- c(warnings, "High residual autocorrelation suggests over-smoothing")
+    if (high_autocor && residual_autocor > 0) warnings <- c(warnings, "High positive autocorrelation suggests over-smoothing")
     if (few_runs) warnings <- c(warnings, "Few sign changes in residuals suggest systematic bias")
     if (low_edf) warnings <- c(warnings, "Very low effective degrees of freedom suggests over-smoothing")
-  } else if (high_edf || high_smoothness) {
+  } else if (high_edf || high_smoothness || negative_autocor) {
     # Classic overfitting (too flexible, not smooth enough)
     overfitted <- TRUE
     if (high_edf) warnings <- c(warnings, "Model may be using too many parameters - consider more smoothing")
     if (high_smoothness) warnings <- c(warnings, "High variability in second differences suggests overfitting")
+    if (negative_autocor) warnings <- c(warnings, "Negative autocorrelation suggests overfitting - residuals alternating too rapidly")
   }
   
   # Generate suggestions based on diagnostic metrics
@@ -176,7 +193,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       "Possible model misspecification:"
     )
     
-    if (model_type == "bspline" && diagnosis$has_bspline_params) {
+    if (model_type == "bspline" && isTRUE(diagnosis$has_bspline_params)) {
       # Check if we already have many knots relative to data
       if (diagnosis$num_basis >= n * 0.4) {
         # Many basis functions but still poor fit - smoothing is likely the issue
@@ -230,7 +247,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       "To reduce over-smoothing:"
     )
     
-    if (model_type == "bspline" && diagnosis$has_bspline_params) {
+    if (model_type == "bspline" && isTRUE(diagnosis$has_bspline_params)) {
       # B-spline specific recommendations
       
       # Check if we already have many knots
@@ -321,7 +338,7 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       "To reduce overfitting (in order of priority):"
     )
     
-    if (model_type == "bspline" && diagnosis$has_bspline_params) {
+    if (model_type == "bspline" && isTRUE(diagnosis$has_bspline_params)) {
       # B-spline specific recommendations
       # Prioritize based on severity
       if (edf_severity > 0.5 || too_many_basis) {
@@ -448,6 +465,9 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
 
 # Print diagnostic results
 print_smoothing_diagnostics <- function(diagnosis) {
+  # Extract model type from diagnosis with defensive check
+  model_type <- ifelse(is.null(diagnosis$model_type), "unknown", diagnosis$model_type)
+  
   # Model Summary first
   cat("\nModel Summary:\n")
   cat("==============\n")
@@ -516,15 +536,6 @@ print_smoothing_diagnostics <- function(diagnosis) {
     max_edf <- diagnosis$num_knots  # C-spline (y_at_knots includes intercept)
   }
   
-  cat("\nModel complexity (use with caution):\n")
-  cat(sprintf("  Parameters: %d basis functions + 1 intercept = %d total\n", 
-              diagnosis$num_basis, diagnosis$num_basis + 1))
-  if (!is.na(diagnosis$smoothing_strength) && diagnosis$smoothing_strength > 0) {
-    cat(sprintf("  Approximate EDF: %.1f (unreliable for regularized splines)\n", diagnosis$edf))
-  } else {
-    cat(sprintf("  Approximate EDF: %.1f (no smoothing applied)\n", diagnosis$edf))
-  }
-  
   # Assessment section
   cat("\nAssessment: ")
   if (diagnosis$over_smoothed) {
@@ -550,8 +561,16 @@ print_smoothing_diagnostics <- function(diagnosis) {
     }
     # Add general advice about parameter adjustment
     cat("\nParameter adjustment guide:\n")
-    cat("- smoothing_strength: 0=none, 0.05-0.1=mild (0.1 default), 0.1-0.2=strong (scales with num_basis^sqrt(2))\n")
-    cat("- num_knots: Keep high enough to capture function complexity, adjust smoothing for regularization\n")
+    # Use isTRUE for safer boolean check
+    if (model_type == "bspline" && isTRUE(diagnosis$has_bspline_params)) {
+      cat("- smoothing_strength: 0=none, 0.05-0.1=mild (0.1 default), 0.1-0.2=strong (scales with num_basis^sqrt(2))\n")
+      cat("- num_knots: Keep high enough to capture function complexity, adjust smoothing for regularization\n")
+    } else if (model_type == "cspline" || !isTRUE(diagnosis$has_bspline_params)) {
+      cat("- num_knots: Only adjustable parameter for C-splines (default n/4 rule)\n")
+      cat("- Fewer knots = smoother fit, more knots = more flexible fit\n")
+    } else {
+      cat("- Model type unknown or parameters missing\n")
+    }
     
     cat("\nInterpreting the metrics:\n")
     cat("- Good fit: Autocorr < 0.2, runs test ~0.5, reasonable visual appearance\n")
@@ -644,7 +663,7 @@ plot_diagnostic_residuals <- function(fit, x, y) {
     geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
     geom_smooth(method = "loess", se = TRUE, alpha = 0.3) +
     labs(title = "Residuals vs X", 
-         subtitle = "Systematic patterns indicate over-smoothing",
+         subtitle = "Check for visible patterns",
          x = "X", y = "Residuals") +
     theme_bw()
   
@@ -670,7 +689,7 @@ plot_diagnostic_residuals <- function(fit, x, y) {
     geom_hline(yintercept = c(-2/sqrt(length(residuals)), 2/sqrt(length(residuals))), 
                linetype = "dashed", color = "red") +
     labs(title = "Residual Autocorrelation",
-         subtitle = "High autocorrelation suggests over-smoothing",
+         subtitle = "Check for high autocorrelation at one or more lags",
          x = "Lag", y = "ACF") +
     theme_bw()
   

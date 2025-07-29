@@ -1,5 +1,5 @@
 // Regional B-splines: Multiple splines for different regions with shared priors
-// Fixed version with proper hierarchical structure
+// Simplified version with better priors
 
 functions {
   // B-spline basis function
@@ -42,8 +42,7 @@ data {
   // Spline parameters
   int<lower=1> num_knots;                  // Number of interior knots
   int<lower=1> spline_degree;              // Degree of spline (3 for cubic)
-  real<lower=0> smoothing_strength_global;  // Smoothing strength for global pattern
-  real<lower=0> smoothing_strength_regional; // Smoothing strength for regional deviations
+  real<lower=0> smoothing_strength;        // Smoothing strength (0=none, 1-2=mild, 5-10=strong)
   real<lower=0> prior_scale;               // Scale for coefficient priors
 }
 
@@ -52,20 +51,12 @@ transformed data {
   int num_basis = num_knots + spline_degree - 1;
   int spline_order = spline_degree + 1;
   
-  // Transform smoothing_strength to tau_smooth for global and regional
-  real tau_smooth_global;
-  real tau_smooth_regional;
-  
-  if (smoothing_strength_global == 0) {
-    tau_smooth_global = 0;  // Special case: independent coefficients
+  // Transform smoothing_strength to tau_smooth
+  real tau_smooth;
+  if (smoothing_strength == 0) {
+    tau_smooth = 0;  // Special case: independent coefficients
   } else {
-    tau_smooth_global = prior_scale / sqrt(smoothing_strength_global * num_basis);
-  }
-  
-  if (smoothing_strength_regional == 0) {
-    tau_smooth_regional = 0;  // Special case: independent coefficients
-  } else {
-    tau_smooth_regional = prior_scale / sqrt(smoothing_strength_regional * num_basis);
+    tau_smooth = prior_scale / sqrt(smoothing_strength * num_basis);  // Scale by data variance and number of basis functions
   }
   
   // Set up knots
@@ -116,14 +107,12 @@ transformed data {
 }
 
 parameters {
-  // Global spline coefficients (raw for smoothing)
-  row_vector[num_basis] mu_alpha_raw;          // Global pattern (raw)
+  // Raw coefficients for non-centered parameterization
+  array[n_regions] row_vector[num_basis] alpha_raw;
   
-  // Regional deviations from global pattern (raw for non-centered)
-  array[n_regions] row_vector[num_basis] alpha_deviation_raw;
-  
-  // Hierarchical SD for regional deviations
-  vector<lower=0>[num_basis] tau_alpha;        // SD of deviations
+  // Hierarchical priors for spline coefficients
+  row_vector[num_basis] mu_alpha_raw;          // Global mean (raw)
+  vector<lower=0>[num_basis] tau_alpha;        // Global SD
   
   // Shared noise parameter
   real<lower=0> sigma;
@@ -136,61 +125,49 @@ parameters {
 
 transformed parameters {
   // Apply random walk smoothing to get actual coefficients
+  array[n_regions] row_vector[num_basis] alpha;
   row_vector[num_basis] mu_alpha;
-  array[n_regions] row_vector[num_basis] alpha_deviation;
-  array[n_regions] row_vector[num_basis] alpha;  // Total regional coefficients
   
-  // Apply smoothing to global pattern
-  if (tau_smooth_global == 0) {
+  // Apply smoothing based on tau_smooth value
+  if (tau_smooth == 0) {
     // No smoothing - independent coefficients
     mu_alpha = mu_alpha_raw * prior_scale;
+    for (r in 1:n_regions) {
+      alpha[r] = alpha_raw[r] .* tau_alpha';
+    }
   } else {
     // Random walk smoothing
     mu_alpha[1] = mu_alpha_raw[1] * prior_scale;
     for (j in 2:num_basis) {
-      mu_alpha[j] = mu_alpha[j-1] + mu_alpha_raw[j] * tau_smooth_global;
-    }
-  }
-  
-  // Transform regional deviations
-  for (r in 1:n_regions) {
-    if (tau_smooth_regional == 0) {
-      // No smoothing - independent deviations
-      alpha_deviation[r] = alpha_deviation_raw[r] .* tau_alpha';
-    } else {
-      // Random walk smoothing for deviations
-      alpha_deviation[r][1] = alpha_deviation_raw[r][1] * tau_alpha[1];
-      for (j in 2:num_basis) {
-        alpha_deviation[r][j] = alpha_deviation[r][j-1] + alpha_deviation_raw[r][j] * tau_smooth_regional * tau_alpha[j];
-      }
+      mu_alpha[j] = mu_alpha[j-1] + mu_alpha_raw[j] * tau_smooth;
     }
     
-    // Total regional coefficients = global + deviation
-    alpha[r] = mu_alpha + alpha_deviation[r];
+    for (r in 1:n_regions) {
+      alpha[r][1] = alpha_raw[r][1] * tau_alpha[1];
+      for (j in 2:num_basis) {
+        alpha[r][j] = alpha[r][j-1] + alpha_raw[r][j] * tau_smooth * tau_alpha[j];
+      }
+    }
   }
   
   // Compute fitted values for each observation
   vector[n_total] y_hat;
   
   for (i in 1:n_total) {
-    // Now using the proper hierarchical structure
     y_hat[i] = alpha[region[i]] * B[:, i] + beta_region[region[i]];
   }
 }
 
 model {
-  // Prior for global pattern coefficients
+  // Priors for raw coefficients (non-centered parameterization)
   mu_alpha_raw ~ std_normal();
+  tau_alpha ~ normal(0, prior_scale);
   
-  // Prior for deviation scales
-  tau_alpha ~ normal(0, prior_scale / 5);  // Encourage small deviations
-  
-  // Priors for regional deviations (non-centered)
   for (r in 1:n_regions) {
-    alpha_deviation_raw[r] ~ std_normal();
+    alpha_raw[r] ~ std_normal();
   }
   
-  // Priors for regional baseline effects
+  // Priors for regional effects
   mu_beta ~ normal(mean(y), fmax(sd(y), 0.1 * fmax(abs(mean(y)), 1.0)));
   sigma_beta ~ exponential(2);
   beta_region ~ normal(mu_beta, sigma_beta);
@@ -213,38 +190,22 @@ generated quantities {
   real var_within = square(sigma);
   real icc = var_between / (var_between + var_within);
   
-  // Variance explained by global vs regional patterns
-  real var_global = 0;
-  real var_regional = 0;
-  {
-    // Compute variance of global pattern across plotting grid
-    vector[1000] global_pattern;
-    array[n_regions] vector[1000] regional_patterns;
-    
-    // Create plotting grid
-    real x_min = min(x);
-    real x_max = max(x);
-    
-    for (i in 1:1000) {
-      x_plot[i] = x_min + (x_max - x_min) * (i - 1.0) / 999.0;
-    }
-    
-    // Build basis for plotting
-    for (i in 1:num_basis) {
-      B_plot[i, :] = to_row_vector(build_b_spline(x_plot, ext_knots_arr, i, spline_order, spline_degree));
-    }
-    
-    // Compute patterns
-    global_pattern = to_vector(mu_alpha * B_plot) + mu_beta;
-    for (r in 1:n_regions) {
-      regional_patterns[r] = to_vector(alpha_deviation[r] * B_plot);
-      y_plot[r] = to_vector(alpha[r] * B_plot) + beta_region[r];
-    }
-    
-    var_global = variance(global_pattern);
-    for (r in 1:n_regions) {
-      var_regional += variance(regional_patterns[r]) / n_regions;
-    }
+  // Create plotting grid
+  real x_min = min(x);
+  real x_max = max(x);
+  
+  for (i in 1:1000) {
+    x_plot[i] = x_min + (x_max - x_min) * (i - 1.0) / 999.0;
+  }
+  
+  // Build basis for plotting
+  for (i in 1:num_basis) {
+    B_plot[i, :] = to_row_vector(build_b_spline(x_plot, ext_knots_arr, i, spline_order, spline_degree));
+  }
+  
+  // Evaluate spline for each region
+  for (r in 1:n_regions) {
+    y_plot[r] = to_vector(alpha[r] * B_plot) + beta_region[r];
   }
 }
 

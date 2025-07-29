@@ -31,14 +31,15 @@ cat("===================================================\n\n")
 cat("Test 1: B-splines with normal smoothing\n")
 cat("---------------------------------------\n")
 
-# Prepare B-spline data
+# Prepare B-spline data with default settings
+default_bspline_knots <- max(4, min(round(n/2), 40))  # n/2 rule
 stan_data_b <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 8,
+  num_knots = default_bspline_knots,
   spline_degree = 3,
-  smoothing_strength = 0,
+  smoothing_strength = 0.07,  # Lighter smoothing for normal case
   prior_scale = 2 * sd(y)
 )
 
@@ -62,12 +63,12 @@ print_smoothing_diagnostics(diagnosis_b)
 cat("\n\nTest 2: C-splines\n")
 cat("-----------------\n")
 
-# Prepare C-spline data (no prior_scale or tau_smooth)
+# Prepare C-spline data with default settings
 stan_data_c <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 8
+  num_knots = 11
 )
 
 # Compile and fit C-spline model
@@ -94,10 +95,10 @@ stan_data_b_overfit <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 20,  # Many knots for n=40
+  num_knots = 2 * default_bspline_knots, 
   spline_degree = 3,
-  smoothing_strength = 0,
-  prior_scale = 5 * sd(y)  # Large prior scale
+  smoothing_strength = 0, # no smoothing.
+  prior_scale = 2 * sd(y) # default
 )
 
 fit_b_overfit <- model_b$sample(
@@ -121,7 +122,7 @@ stan_data_c_smooth <- list(
   n_data = n,
   x = x,
   y = y,
-  num_knots = 3  # Very few knots
+  num_knots = 4  # Few knots for over-smoothing
 )
 
 fit_c_smooth <- model_c$sample(
@@ -169,7 +170,7 @@ create_diagnostic_plot <- function(fit, x, y, y_true, title, subtitle, color = "
                 alpha = 0.3, fill = color) +
     geom_line(data = df_fit, aes(x = x, y = y), color = color, linewidth = 1.2) +
     geom_point(data = data.frame(x = x, y = y), aes(x = x, y = y), 
-               alpha = 0.6, size = 1.5) +
+               alpha = 0.6, linewidth = 1.5) +
     geom_line(data = data.frame(x = x, y = y_true), aes(x = x, y = y), 
               color = "red", linetype = "dashed", alpha = 0.7, linewidth = 0.8) +
     labs(title = title, subtitle = subtitle, x = "x", y = "y") +
@@ -184,7 +185,7 @@ create_diagnostic_plot <- function(fit, x, y, y_true, title, subtitle, color = "
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
     geom_point(alpha = 0.6, color = color) +
     geom_smooth(method = "loess", se = TRUE, color = "black", 
-                fill = "gray80", alpha = 0.3, size = 0.5) +
+                fill = "gray80", alpha = 0.3, linewidth = 0.5) +
     labs(title = "Residuals", x = "x", y = "Residuals") +
     theme_bw() +
     theme(plot.title = element_text(size = 9))
@@ -194,26 +195,32 @@ create_diagnostic_plot <- function(fit, x, y, y_true, title, subtitle, color = "
 
 # Create plots for all 4 scenarios
 plots_b_normal <- create_diagnostic_plot(fit_b, x, y, y_true, 
-                                         "B-spline: Normal Settings",
-                                         sprintf("8 knots, smoothing=0, autocorr=%.3f", 
+                                         "B-spline: Fitting Settings",
+                                         sprintf("%d knots, smoothing=%.2f, autocorr=%.3f", 
+                                                 stan_data_b$num_knots,
+                                                 stan_data_b$smoothing_strength,
                                                  diagnosis_b$residual_autocor),
                                          "blue")
 
 plots_c_normal <- create_diagnostic_plot(fit_c, x, y, y_true,
-                                         "C-spline: Normal Settings", 
-                                         sprintf("8 knots, autocorr=%.3f",
+                                         "C-spline: Fitting Settings", 
+                                         sprintf("%d knots, autocorr=%.3f",
+                                                 stan_data_c$num_knots,
                                                  diagnosis_c$residual_autocor),
                                          "darkgreen")
 
 plots_b_overfit <- create_diagnostic_plot(fit_b_overfit, x, y, y_true,
                                           "B-spline: Overfitting",
-                                          sprintf("20 knots, smoothing=0, autocorr=%.3f",
+                                          sprintf("%d knots, smoothing=%.2f, autocorr=%.3f",
+                                                  stan_data_b_overfit$num_knots,
+                                                  stan_data_b_overfit$smoothing_strength,
                                                   diagnosis_b_overfit$residual_autocor),
                                           "darkred")
 
 plots_c_smooth <- create_diagnostic_plot(fit_c_smooth, x, y, y_true,
                                          "C-spline: Over-smoothing",
-                                         sprintf("3 knots, autocorr=%.3f",
+                                         sprintf("%d knots, autocorr=%.3f",
+                                                 stan_data_c_smooth$num_knots,
                                                  diagnosis_c_smooth$residual_autocor),
                                          "darkorange")
 
@@ -239,40 +246,65 @@ cat("Saved diagnostic scenarios plot to output/test-diagnostic_recommendations_s
 
 # Create a second plot showing diagnostic metrics
 create_metrics_plot <- function(diagnosis_list, names) {
-  # Extract key metrics
-  metrics_df <- data.frame(
-    Scenario = factor(names, levels = names),
-    Autocorrelation = sapply(diagnosis_list, function(d) d$residual_autocor),
-    Runs_Test = sapply(diagnosis_list, function(d) d$runs_proportion),
-    Residual_SD = sapply(diagnosis_list, function(d) d$residual_sd),
-    Smoothness = sapply(diagnosis_list, function(d) ifelse(is.na(d$smoothness), 0, d$smoothness))
-  )
+  # Extract key metrics for each diagnosis
+  plot_list <- list()
   
-  # Convert to long format for plotting
-  metrics_long <- tidyr::pivot_longer(metrics_df, 
-                                      cols = -Scenario,
-                                      names_to = "Metric",
-                                      values_to = "Value")
+  for (i in seq_along(diagnosis_list)) {
+    d <- diagnosis_list[[i]]
+    
+    # Create data frame for this scenario (removed Residual SD)
+    metrics_df <- data.frame(
+      Metric = c("Autocorrelation", "Runs Test", "Smoothness"),
+      Value = c(d$residual_autocor, d$runs_proportion, 
+                ifelse(is.na(d$smoothness), 0, d$smoothness))
+    )
+    
+    # Set colors based on metric type and values (using lighter colors)
+    colors <- c(
+      ifelse(abs(d$residual_autocor) > 0.3, "#ff6b6b",  # Light red for high positive or negative
+             ifelse(abs(d$residual_autocor) > 0.2, "#ffa726", "#66bb6a")),  # Light orange/green
+      ifelse(abs(d$runs_proportion - 0.5) > 0.2, "#ff6b6b", 
+             ifelse(abs(d$runs_proportion - 0.5) > 0.1, "#ffa726", "#66bb6a")),  # Runs
+      ifelse(!is.na(d$smoothness) && d$smoothness > d$residual_sd * 1.5, 
+             "#ff6b6b", "#66bb6a")  # Smoothness
+    )
+    
+    # Create individual plot
+    p <- ggplot(metrics_df, aes(x = Metric, y = Value, fill = Metric)) +
+      geom_col() +
+      scale_fill_manual(values = colors) +
+      ylim(-0.6, 1.0) +  # Consistent y-axis range
+      labs(title = names[i], y = "Value") +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1),
+            axis.title.x = element_blank(),
+            legend.position = "none",
+            plot.title = element_text(size = 10, hjust = 0.5))
+    
+    plot_list[[i]] <- p
+  }
   
-  # Create the plot
-  p <- ggplot(metrics_long, aes(x = Scenario, y = Value, fill = Scenario)) +
-    geom_col() +
-    facet_wrap(~ Metric, scales = "free_y", ncol = 2) +
-    scale_fill_manual(values = c("blue", "darkgreen", "darkred", "darkorange")) +
-    labs(title = "Diagnostic Metrics Comparison",
-         subtitle = "Key metrics that drive the diagnostic recommendations",
-         x = "", y = "Metric Value") +
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1),
-          legend.position = "none")
+  # Combine all plots
+  combined <- plot_list[[1]] + plot_list[[2]] + plot_list[[3]] + plot_list[[4]] +
+    plot_layout(nrow = 1) +
+    plot_annotation(
+      title = "Diagnostic Metrics by Scenario",
+      subtitle = "Green = good, Orange = warning, Red = problem. Each subplot shows one model configuration.",
+      caption = "Target values: |Autocorrelation| < 0.2, Runs Test within 0.1 of 0.5, Smoothness < 1.5 × Residual SD",
+      theme = theme(plot.title = element_text(size = 14, face = "bold"))
+    )
   
-  return(p)
+  return(combined)
 }
 
 # Create metrics comparison plot
 diagnosis_list <- list(diagnosis_b, diagnosis_c, diagnosis_b_overfit, diagnosis_c_smooth)
-scenario_names <- c("B-spline Normal", "C-spline Normal", 
-                    "B-spline Overfit", "C-spline Over-smooth")
+scenario_names <- c(
+  sprintf("B-spline Fitting\n(%d knots, smoothing=%.2f)", diagnosis_b$num_knots, diagnosis_b$smoothing_strength),
+  sprintf("C-spline Fitting\n(%d knots)", diagnosis_c$num_knots),
+  sprintf("B-spline Overfit\n(%d knots, smoothing=%.2f)", diagnosis_b_overfit$num_knots, diagnosis_b_overfit$smoothing_strength),
+  sprintf("C-spline Over-smooth\n(%d knots)", diagnosis_c_smooth$num_knots)
+)
 
 metrics_plot <- create_metrics_plot(diagnosis_list, scenario_names)
 
@@ -281,16 +313,16 @@ ggsave("output/test-diagnostic_metrics_comparison.png", metrics_plot,
 cat("Saved diagnostic metrics plot to output/test-diagnostic_metrics_comparison.png\n")
 
 # Summary
-cat("\n\nSummary of Diagnostic Differences\n")
-cat("=================================\n")
-cat("B-splines have access to:\n")
-cat("  - prior_scale adjustments\n")
-cat("  - tau_smooth for random walk smoothing\n")
-cat("  - num_knots control\n\n")
-cat("C-splines only have:\n")
-cat("  - num_knots control\n")
-cat("  - Natural boundary conditions (built-in)\n\n")
-cat("The diagnostics now provide appropriate advice for each spline type.\n")
+cat("\n\nSummary of Spline Control Parameters\n")
+cat("===================================\n")
+cat("B-splines:\n")
+cat("  - smoothing_strength: Primary control (default 0.1) - adjust this first!\n")
+cat("  - num_knots: Auto-selected using n/2 rule (rarely needs adjustment)\n")
+cat("  - prior_scale: Auto-scaled to 2*sd(y) (rarely needs adjustment)\n\n")
+cat("C-splines:\n")
+cat("  - num_knots: Only control parameter (default n/4 rule)\n")
+cat("  - Natural boundary conditions built-in\n\n")
+cat("The diagnostics guide you to appropriate parameter adjustments.\n")
 
 # Close the null device
 dev.off()
