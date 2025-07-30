@@ -36,10 +36,22 @@ y <- y_true + rnorm(n, 0, 0.15)
 adaptive_knots <- max(4, min(round(n/2), 40))
 
 # 2. Adaptive prior scale based on data variance
-adaptive_prior <- 2 * sd(y)
+adaptive_prior <- 2 * sd(y)  # Traditional default, but see note below
+# Note: The factor of 2 is quite generous. Consider using 1 * sd(y) for a more
+# principled prior that assumes the spline captures up to the total data variation.
+# In hierarchical models, reduce further: 0.5-0.7 * sd(y) for two components
 
 # 3. Default smoothing for more stable fits
 # smoothing_strength: 0=none, 0.05-0.1=mild, 0.1-0.2=strong
+#
+# SPLINE TUNING PRIORITY:
+# 1. First: Adjust smoothing_strength (start with 0.1, reduce if underfit)
+# 2. Second: Increase knots if more flexibility needed (default n/2 is usually sufficient)
+# 3. Third: In hierarchical models, reduce prior_scale to improve identifiability
+#    - Single spline: prior_scale = 1 * sd(y) (recommended: captures total variation)
+#    - Single spline: prior_scale = 2 * sd(y) (traditional but overly generous)
+#    - Two hierarchical components: prior_scale = 0.7 * sd(y) (down from 1, assumes ~50% variance each)
+#    - Many components: prior_scale = 0.5 * sd(y) or less
 
 # Prepare data for Stan
 stan_data <- list(

@@ -5,6 +5,16 @@
 # The suggested parameter adjustments are based on heuristics and may need
 # fine-tuning for your specific application. Always validate the results.
 
+# HIERARCHICAL MODEL CONSIDERATIONS (B-splines only):
+# When B-splines are part of a hierarchy (e.g., global + regional effects):
+# 1. Reduce prior_scale from single spline default:
+#    - Single spline: prior_scale = 1 * sd(y) (captures up to total variation)
+#    - Two hierarchical components: prior_scale = 0.7 * sd(y) (assumes ~50% variance each)
+#    - Many components: prior_scale = 0.5 * sd(y) or less
+#    Note: Traditional default was 2 * sd(y) but this is overly generous
+# 2. Monitor shrinkage_factor in adaptive models - values >5 suggest prior_scale too large
+# 3. Negative autocorrelation often indicates variance misallocation between components
+
 # GUIDANCE SECTION FOR CLAUDE CODE:
 #
 # IMPORTANT: Diagnostic advice should be data-driven, not hard-coded
@@ -157,7 +167,8 @@ diagnose_smoothing <- function(fit, x, y, stan_data, model_type = "bspline") {
       if (diagnosis$smoothing_strength < 0.05) {
         warnings <- c(warnings, 
           "High autocorrelation despite low smoothing suggests possible model misspecification",
-          "The function may have features that the current spline configuration cannot capture")
+          "The function may have features that the current spline configuration cannot capture",
+          "In hierarchical models: Check if prior_scale is too large (try 0.5-0.7 * sd(y) instead of 2 * sd(y))")
       } else {
         over_smoothed <- TRUE
         warnings <- c(warnings, 

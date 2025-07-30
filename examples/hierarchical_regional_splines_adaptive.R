@@ -1,10 +1,18 @@
 # Hierarchical Regional B-splines with Adaptive Shrinkage
 # Updated version with different smoothing strengths and adaptive shrinkage
 
+library(conflicted)
+conflicts_prefer(dplyr::filter)
+conflicts_prefer(dplyr::lag)
+conflicts_prefer(dplyr::select)
+conflicts_prefer(stats::sd)  # Use base R sd, not posterior::sd
+
+library(groundhog)
+stan_pkgs <- c("posterior", "checkmate", "R6", "jsonlite", "processx")
+pkgs <- c("dplyr", "ggplot2", "patchwork", "tidyr")
+groundhog.library(c(stan_pkgs, pkgs), "2025-06-01")
+
 library(cmdstanr)
-library(ggplot2)
-library(dplyr)
-library(tidyr)
 
 set.seed(42)
 
@@ -28,8 +36,8 @@ generate_regional_data <- function(n_per_region = 40) {
   # 2. Seasonal pattern shared across regions (e.g., flu season, shopping patterns)
   seasonality <- 0.8 * sin(2 * pi * x / 3.5)  # Period of 3.5 units
   
-  # Combined global pattern
-  global_pattern <- global_trend + seasonality
+  # Combined global pattern (increased amplitude by 10%)
+  global_pattern <- 1.1 * (global_trend + seasonality)
   
   # 3. Region-specific deviations (comparable amplitude to global pattern)
   # Region A: Strong early peak
@@ -94,17 +102,17 @@ stan_data <- list(
   x = data$x,
   y = data$y,
   region = data$region,
-  num_knots = 2 * max(4, min(round(n_per_region/2), 40)),  # Double the default knots
+  num_knots = 20,  # Fixed at 20 knots as requested
   spline_degree = 3,
-  smoothing_strength_global = 0.05,    # Mild smoothing for global pattern
-  smoothing_strength_regional = 0.05,  # Mild smoothing for regional deviations
-  prior_scale = 2 * sd(data$y)  # Adaptive prior scale
+  smoothing_strength_global = 0.01,    # Very light smoothing for global pattern
+  smoothing_strength_regional = 0.01,  # Very light smoothing for regional deviations
+  prior_scale = 2 * sd(data$y)  # Back to traditional default
 )
 
 cat("Model configuration:\n")
 cat(sprintf("- Number of knots: %d (doubled from default n/2 rule)\n", stan_data$num_knots))
-cat(sprintf("- Global smoothing: %.2f (mild smoothing - same as regional)\n", stan_data$smoothing_strength_global))
-cat(sprintf("- Regional smoothing: %.2f (mild smoothing)\n", stan_data$smoothing_strength_regional))
+cat(sprintf("- Global smoothing: %.2f (very light smoothing)\n", stan_data$smoothing_strength_global))
+cat(sprintf("- Regional smoothing: %.2f (very light smoothing)\n", stan_data$smoothing_strength_regional))
 cat("- Shrinkage: Adaptive (learned from data)\n\n")
 
 # Compile and fit model
@@ -127,7 +135,7 @@ fit <- model$sample(
     iter_sampling = 5000,
     refresh = 0,
     seed = 123,
-    adapt_delta = 0.999,
+    adapt_delta = 0.9995,
     max_treedepth = 15
   )
   
@@ -136,25 +144,37 @@ fit <- model$sample(
   diag_summary <- fit$diagnostic_summary()
   print(diag_summary)
   
-  # Extract draws
-  draws <- fit$draws(format = "matrix")
+  # Extract draws efficiently by variable groups
+  # Core parameters for analysis
+  draws_core <- fit$draws(variables = c("mu_alpha", "mu_beta", "alpha_deviation", 
+                                        "beta_region", "shrinkage_factor", "sigma",
+                                        "tau_alpha", "sigma_beta"), 
+                         format = "matrix")
+  
+  # Y_hat for diagnostics
+  draws_yhat <- fit$draws(variables = "y_hat", format = "matrix")
+  
+  # Variance components
+  draws_var <- fit$draws(variables = c("var_between", "var_within", "icc", 
+                                       "var_global", "var_regional"),
+                        format = "matrix")
 
 # Print adaptive shrinkage information
-shrinkage_mean <- mean(draws[, "shrinkage_factor"])
-shrinkage_sd <- sd(draws[, "shrinkage_factor"])
+shrinkage_mean <- mean(draws_core[, "shrinkage_factor"])
+shrinkage_sd <- sd(draws_core[, "shrinkage_factor"])
 cat(sprintf("\nAdaptive shrinkage factor: %.2f ± %.2f\n", shrinkage_mean, shrinkage_sd))
-cat("(Higher values = more shrinkage of regional deviations)\n\n")
+cat("(Lower values = more shrinkage, 1.0 = no shrinkage)\n\n")
 
 # Create output directory
 dir.create("output", showWarnings = FALSE)
 
 # Extract global pattern from the model
-mu_alpha_cols <- grep("^mu_alpha\\.", colnames(draws), value = TRUE)
+mu_alpha_cols <- grep("^mu_alpha\\.", colnames(draws_core), value = TRUE)
 if (length(mu_alpha_cols) == 0) {
-  mu_alpha_cols <- grep("^mu_alpha\\[", colnames(draws), value = TRUE)
+  mu_alpha_cols <- grep("^mu_alpha\\[", colnames(draws_core), value = TRUE)
 }
-mu_alpha_mean <- colMeans(draws[, mu_alpha_cols, drop = FALSE])
-mu_beta <- mean(draws[, "mu_beta"])
+mu_alpha_mean <- colMeans(draws_core[, mu_alpha_cols, drop = FALSE])
+mu_beta <- mean(draws_core[, "mu_beta"])
 
 # Build basis matrix for plotting
 # Copy the build_b_spline function from the Stan file
@@ -212,12 +232,12 @@ for (i in 1:num_basis) {
 }
 
 # Compute recovered global pattern with uncertainty
-mu_alpha_samples <- draws[, mu_alpha_cols, drop = FALSE]
-mu_beta_samples <- draws[, "mu_beta"]
+mu_alpha_samples <- draws_core[, mu_alpha_cols, drop = FALSE]
+mu_beta_samples <- draws_core[, "mu_beta"]
 
 # Compute global pattern for each MCMC sample
-global_pattern_samples <- matrix(0, nrow(draws), length(x_plot))
-for (i in 1:nrow(draws)) {
+global_pattern_samples <- matrix(0, nrow(draws_core), length(x_plot))
+for (i in 1:nrow(draws_core)) {
   global_pattern_samples[i,] <- as.numeric(B_plot %*% as.numeric(mu_alpha_samples[i,])) + mu_beta_samples[i]
 }
 
@@ -229,17 +249,17 @@ recovered_global_upper <- apply(global_pattern_samples, 2, quantile, 0.975)
 # Extract regional deviations
 regional_deviations <- list()
 for (r in 1:3) {
-  alpha_deviation_cols <- grep(paste0("^alpha_deviation\\[", r, ","), colnames(draws), value = TRUE)
+  alpha_deviation_cols <- grep(paste0("^alpha_deviation\\[", r, ","), colnames(draws_core), value = TRUE)
   if (length(alpha_deviation_cols) == 0) {
-    alpha_deviation_cols <- grep(paste0("^alpha_deviation\\.", r, "\\."), colnames(draws), value = TRUE)
+    alpha_deviation_cols <- grep(paste0("^alpha_deviation\\.", r, "\\."), colnames(draws_core), value = TRUE)
   }
   
-  alpha_deviation_r_samples <- draws[, alpha_deviation_cols, drop = FALSE]
-  beta_r_samples <- draws[, paste0("beta_region[", r, "]")]
+  alpha_deviation_r_samples <- draws_core[, alpha_deviation_cols, drop = FALSE]
+  beta_r_samples <- draws_core[, paste0("beta_region[", r, "]")]
   
   # Compute deviation for each MCMC sample
-  deviation_samples <- matrix(0, nrow(draws), length(x_plot))
-  for (i in 1:nrow(draws)) {
+  deviation_samples <- matrix(0, nrow(draws_core), length(x_plot))
+  for (i in 1:nrow(draws_core)) {
     deviation_samples[i,] <- as.numeric(B_plot %*% as.numeric(alpha_deviation_r_samples[i,])) + 
                              (beta_r_samples[i] - mu_beta_samples[i])
   }
@@ -270,8 +290,8 @@ p_global <- ggplot(df_global, aes(x = x)) +
   geom_ribbon(aes(ymin = y_lower, ymax = y_upper), fill = "blue", alpha = 0.3) +
   geom_line(aes(y = y_true), color = "black", linetype = "dashed", linewidth = 1.2) +
   geom_line(aes(y = y_recovered), color = "blue", linewidth = 1.2) +
-  labs(title = "Global Pattern Recovery (Adaptive Shrinkage)",
-       subtitle = sprintf("Mild global smoothing (%.2f) matches regional smoothing", 
+  labs(title = "Global Pattern Recovery",
+       subtitle = sprintf("Global smoothing (%.2f)", 
                          stan_data$smoothing_strength_global),
        x = "x", y = "y") +
   theme_bw()
@@ -300,16 +320,16 @@ p_regional <- ggplot(df_regional, aes(x = x)) +
   facet_wrap(~ region, scales = "free_y") +
   labs(title = sprintf("Regional Deviations (Adaptive shrinkage: %.1f ± %.1f)", 
                       shrinkage_mean, shrinkage_sd),
-       subtitle = sprintf("Very mild regional smoothing (%.2f)", 
+       subtitle = sprintf("Regional smoothing: %.2f", 
                          stan_data$smoothing_strength_regional),
        x = "x", y = "Deviation from global") +
   theme_bw()
 
 # 3. Overall fit per region
-y_hat_cols <- grep("y_hat\\[", colnames(draws), value = TRUE)
-y_hat_mean <- colMeans(draws[, y_hat_cols])
-y_hat_lower <- apply(draws[, y_hat_cols], 2, quantile, 0.025)
-y_hat_upper <- apply(draws[, y_hat_cols], 2, quantile, 0.975)
+y_hat_cols <- grep("y_hat\\[", colnames(draws_yhat), value = TRUE)
+y_hat_mean <- colMeans(draws_yhat[, y_hat_cols])
+y_hat_lower <- apply(draws_yhat[, y_hat_cols], 2, quantile, 0.025)
+y_hat_upper <- apply(draws_yhat[, y_hat_cols], 2, quantile, 0.975)
 
 data$y_fitted <- y_hat_mean
 data$y_lower <- y_hat_lower
@@ -338,7 +358,7 @@ combined_plot <- p_global / p_regional / p_fits +
   plot_layout(heights = c(1, 1, 1.2)) +
   plot_annotation(
     title = "Adaptive Hierarchical Spline Decomposition",
-    subtitle = "Improved pattern separation with adaptive shrinkage and differential smoothing"
+    subtitle = "Improved pattern separation with adaptive shrinkage and equal smoothing"
   )
 
 # Save to the correct output directory
@@ -571,8 +591,9 @@ cat("\n======================================\n")
 cat("Improvements Summary\n")
 cat("======================================\n")
 cat("1. Adaptive shrinkage factor learned from data\n")
-cat("2. Equal smoothing (0.05) for both global and regional patterns\n")
+cat("2. Different smoothing: very light for both global and regional (0.01)\n")
 cat("3. Prevents overfitting while maintaining flexibility\n")
 cat("4. Doubled knots for better flexibility\n")
 cat("5. Correct residual calculations for hierarchical structure\n")
 cat("\nRun both models to compare diagnostics!\n")
+

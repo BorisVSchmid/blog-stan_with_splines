@@ -155,7 +155,7 @@ transformed parameters {
   }
   
   // Apply adaptive shrinkage to tau_alpha
-  tau_alpha = tau_alpha_base * (prior_scale / shrinkage_factor);
+  tau_alpha = tau_alpha_base * prior_scale * shrinkage_factor;
   
   // Transform regional deviations
   for (r in 1:n_regions) {
@@ -188,10 +188,10 @@ model {
   mu_alpha_raw ~ std_normal();
   
   // Prior for base deviation scales
-  tau_alpha_base ~ std_normal();  // Unit scale, will be scaled by shrinkage
+  tau_alpha_base ~ std_normal();  // Back to standard normal
   
-  // Adaptive shrinkage prior - weakly informative, centered at 5 (current fixed value)
-  shrinkage_factor ~ normal(5, 2);
+  // Adaptive shrinkage prior - centered at no shrinkage
+  shrinkage_factor ~ normal(1.0, 0.5);
   
   // Priors for regional deviations (non-centered)
   for (r in 1:n_regions) {
@@ -259,3 +259,5 @@ generated quantities {
     }
   }
 }
+
+
