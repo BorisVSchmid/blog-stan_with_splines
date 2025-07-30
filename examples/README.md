@@ -4,80 +4,77 @@ This directory contains advanced examples demonstrating hierarchical and regiona
 
 ## Files
 
-### hierarchical_regional_splines.R
-Comprehensive example of hierarchical B-splines with:
-- Multiple regions with shared global trend
-- Region-specific deviations
-- Variance component estimation
-- Model caching for repeated runs
-- Advanced visualization including:
-  - Individual region fits
-  - Global trend extraction
-  - Variance decomposition
-  - Coefficient shrinkage patterns
+### hierarchical_regional_splines_adaptive.R
+Hierarchical B-splines example with adaptive shrinkage:
+- 3 regions with shared global trend and regional deviations
+- Adaptive shrinkage that learns from data
+- Doubled knots: `2 * max(4, min(round(n/2), 40))`
+- Equal smoothing (0.05) for both global and regional patterns
+- Proper residual diagnostics for hierarchical models
 
-Key features:
-- 4 regions with different patterns
-- Hierarchical structure for borrowing strength
-- MCMC diagnostics with 4 parallel chains
-- Publication-quality multi-panel plots
-
-### regional_splines.stan
-Stan model implementing hierarchical B-splines:
+### regional_splines_adaptive.stan
+Stan model implementing adaptive hierarchical B-splines:
 - Global spline coefficients with region-specific deviations
-- Proper hierarchical priors
-- Variance component parameters
-- Generated quantities for prediction and model assessment
+- Adaptive shrinkage: `shrinkage_factor ~ normal(5, 2)`
+- Transforms to: `tau_alpha = tau_alpha_base * (prior_scale / shrinkage_factor)`
+- Variance decomposition in generated quantities
 
-Model structure:
-```
-y[i,j] ~ normal(global_spline[i] + regional_deviation[i,j], sigma)
-regional_deviation[i,j] ~ normal(0, tau_alpha)
-```
-
-## Running the Example
+## Running the Examples
 
 ```r
-# Run the hierarchical regional splines example
+# Run the original model (fixed shrinkage)
 source("examples/hierarchical_regional_splines.R")
+
+# Run the adaptive model (recommended)
+source("examples/hierarchical_regional_splines_adaptive.R")
 ```
 
-This will:
-1. Generate synthetic data for 4 regions
+Both examples will:
+1. Generate synthetic data for 3 regions with known patterns
 2. Fit the hierarchical model (or load from cache)
-3. Print MCMC diagnostics
+3. Print MCMC diagnostics and shrinkage information
 4. Create comprehensive visualizations
 5. Save output plots to `output/` directory
+6. Generate diagnostic plots with correct residuals
 
 ## Output Files
 
-The example generates:
-- `output/example-hierarchical_model_fit.rds`: Cached model fit
-- `output/example-regional_splines_data.png`: Raw data visualization
-- `output/example-regional_splines_fitted.png`: Fitted curves by region
-- `output/example-regional_splines_global_coefficients.png`: Coefficient patterns
-- `output/example-regional_splines_variance_components.png`: Variance decomposition
+### Original Model
+- `output/example-hierarchical_model_draws.rds`: Cached model draws
+- `output/example-hierarchical_decomposition.png`: Pattern decomposition
+- `output/example-hierarchical_spline_diagnostics.png`: Diagnostic plots
+- `output/example-hierarchical_spline_diagnostics.csv`: Diagnostic metrics
+
+### Adaptive Model
+- `output/example-hierarchical_adaptive_model_draws.rds`: Cached model draws
+- `output/example-hierarchical_adaptive_decomposition.png`: Improved decomposition
+- `output/example-hierarchical_adaptive_spline_diagnostics.png`: Better diagnostics
+- `output/example-hierarchical_adaptive_spline_diagnostics.csv`: Diagnostic metrics
 
 ## Model Details
 
-### Parameters
+### Parameters (Original Model)
 - `mu_alpha`: Global spline coefficient means
-- `tau_alpha`: Between-region standard deviation
-- `alpha_raw`: Standardized region deviations
+- `tau_alpha`: Between-region standard deviation (fixed at `prior_scale/5`)
+- `alpha_deviation_raw`: Standardized region deviations
 - `sigma`: Observation noise
 - `beta_region`: Region-specific intercepts
 
-### Derived Quantities
-- `alpha[r,k]`: Actual coefficients for region r, basis k
-- `y_global`: Global trend (average across regions)
-- `icc`: Intraclass correlation coefficient
+### Additional Parameters (Adaptive Model)
+- `shrinkage_factor`: Learned shrinkage parameter (~5 typical)
+- `tau_alpha_base`: Base standard deviations before shrinkage
+- Transforms to: `tau_alpha = tau_alpha_base * (prior_scale / shrinkage_factor)`
+
+### Key Differences
+- **Fixed model**: Regional variance is `prior_scale/5` (hardcoded)
+- **Adaptive model**: Regional variance adapts to data via `shrinkage_factor`
 
 ### Sampling Configuration
 - 4 chains run in parallel
 - 3000 warmup iterations
 - 5000 sampling iterations
-- `adapt_delta = 0.995` for challenging posterior
-- `max_treedepth = 12` for complex hierarchies
+- `adapt_delta = 0.999` for challenging posterior
+- `max_treedepth = 15` for complex hierarchies
 
 ## Interpretation
 
@@ -87,36 +84,32 @@ The hierarchical model allows:
 3. **Uncertainty Quantification**: Proper accounting for all sources of variation
 4. **Variance Decomposition**: Separate global vs regional variation
 
-## Extending the Example
+## Choosing Between Models
 
-To adapt for your data:
+### Use the Adaptive Model When:
+- You don't know how much regional variation to expect
+- Regional effects may vary across datasets
+- You want the model to learn the appropriate balance
+- You need better diagnostics (correct residuals)
 
-1. **Change number of regions**:
-   ```r
-   n_regions <- 6  # Your number of regions
-   ```
 
-2. **Modify data generation**:
-   ```r
-   # Replace synthetic data with your real data
-   data_list <- list(
-     region1 = data.frame(x = x1, y = y1),
-     region2 = data.frame(x = x2, y = y2),
-     ...
-   )
-   ```
+## Key Parameters to Tune
 
-3. **Adjust spline parameters**:
-   ```r
-   num_knots <- 12  # More knots for complex patterns
-   spline_degree <- 3  # Keep cubic for smoothness
-   ```
+### Smoothing Strength
+- Controls wiggliness (shape) of patterns
+- **0**: No smoothing (maximum flexibility)
+- **0.05**: Mild smoothing (recommended default)
+- **0.1+**: Strong smoothing (very smooth patterns)
 
-4. **Customize priors**:
-   ```stan
-   // In regional_splines.stan
-   tau_alpha ~ normal(0, 1);  // Tighter prior for less variation
-   ```
+### Number of Knots
+- More knots = more flexibility
+- Default: `max(4, min(round(n/2), 40))`
+- Adaptive model doubles this for better flexibility
+
+### Adaptive Shrinkage
+- Controls amplitude of regional deviations
+- Learned from data, typically 2-10
+- Higher values = more shrinkage toward global
 
 ## Troubleshooting
 
