@@ -47,11 +47,11 @@ source("code/csplines.R")   # C-spline minimal example
 
 # Run specific tests
 source("tests/test_basic_splines.R")              # Quick functionality check
-source("tests/test_various_target_functions.R")   # Comprehensive testing
-source("tests/test_regional_splines.R")           # Hierarchical models
+source("tests/test_analytical_solutions.R")       # Known function fitting
+source("tests/test_diagnostic_recommendations.R") # Smoothing diagnostics
 
 # Run examples
-source("examples/hierarchical_regional_splines.R")
+source("examples/hierarchical_regional_splines_adaptive.R")
 ```
 
 ### Building Stan Models
@@ -60,7 +60,7 @@ Models are compiled automatically when running scripts. To manually compile:
 library(cmdstanr)
 model_b <- cmdstan_model("code/bsplines.stan")
 model_c <- cmdstan_model("code/csplines.stan")
-model_regional <- cmdstan_model("examples/regional_splines.stan")
+model_regional_adaptive <- cmdstan_model("examples/regional_splines_adaptive.stan")
 ```
 
 ## Architecture
@@ -106,12 +106,13 @@ All models now run with:
 
 ### Testing Framework
 
-The test suite (`run-tests.R`) includes 5 tests in order of complexity:
+The test suite (`run-tests.R`) includes 6 tests in order of complexity:
 1. `test_basic_splines.R` - Basic functionality check
 2. `test_edge_cases_minimal_knots.R` - Minimal knot configuration (2-3 knots)
 3. `test_numerical_accuracy.R` - Mathematical properties
 4. `test_analytical_solutions.R` - Known function fitting
 5. `test_sine_wave_smoothing.R` - B-spline smoothing effects on sine waves
+6. `test_diagnostic_recommendations.R` - Tests smoothing diagnostics with multiple scenarios
 
 ## Critical Stan Requirements
 
@@ -174,6 +175,12 @@ The `code/smoothing_diagnostics.R` file provides:
 - `diagnose_smoothing()`: Calculates EDF, residual patterns, cross-validation metrics
 - `print_smoothing_diagnostics()`: Pretty-prints diagnostic results with recommendations
 - Automated parameter tuning suggestions based on diagnostic metrics
+- `fit_with_diagnostics()`: Wrapper function for fitting with automatic diagnostics
+- `plot_diagnostic_residuals()`: Creates diagnostic residual plots
+
+Additional diagnostic documentation:
+- `code/DIAGNOSTIC_INTERPRETATION.md`: Guide for interpreting diagnostic plots
+- `code/IMPLEMENTATION_DIFFERENCES.md`: Differences from original spline implementations
 
 ### Output Organization
 - All plots saved to `output/` directory with consistent naming:
@@ -185,7 +192,12 @@ The `code/smoothing_diagnostics.R` file provides:
 ## Regional/Hierarchical Models
 
 The `examples/` directory contains advanced hierarchical implementations:
-- `regional_splines.stan`: Hierarchical B-splines with region-specific deviations
-- Variance component estimation (between vs within-region)
-- Model caching for repeated runs
-- Comprehensive visualization of regional patterns
+- `regional_splines_adaptive.stan`: Hierarchical B-splines with adaptive shrinkage
+- `hierarchical_regional_splines_adaptive.R`: Example demonstrating the adaptive model
+- Features:
+  - Separate smoothing strengths for global vs regional patterns
+  - Adaptive shrinkage factor that learns from data
+  - Variance component estimation (between vs within-region)
+  - Better separation of shared and regional components
+  - Model caching for repeated runs
+  - Comprehensive visualization of regional patterns
