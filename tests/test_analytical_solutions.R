@@ -847,11 +847,11 @@ cat("  Plot names:", paste(names(all_fits), collapse = ", "), "\n\n")
 
 if (length(all_fits) > 0) {
   combined_plot <- wrap_plots(all_fits, ncol = 2) +
-    plot_annotation(
-      title = "Analytical Solutions Test: How Well Do Splines Handle Known Functions?",
-      subtitle = "Black dashed lines show true functions, colored lines show spline fits (B-splines=blue, C-splines=green)",
-      caption = "Note: All tests use adaptive knot selection (B-splines: n/2 knots, C-splines: n/4 knots) with default smoothing=1.0 for B-splines"
-    )
+      plot_annotation(
+        title = "Analytical Solutions Test: How Well Do Splines Handle Known Functions?",
+        subtitle = "Black dashed lines show true functions, colored lines show spline fits (B-splines=blue, C-splines=green)",
+        caption = "Note: All tests use adaptive knot selection (B-splines: n/2 knots, C-splines: n/4 knots) with default smoothing=0.1 for B-splines"
+      )
   
   # Save the plot
   dir.create("output", showWarnings = FALSE)
