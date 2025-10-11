@@ -2,7 +2,8 @@
 
 This repository contains minimal implementations for testing B-splines and natural cubic splines (C-splines) in Stan, with comprehensive testing and comparison tools.
 
-**Built with [Claude Code](https://claude.ai/code)** - An AI-powered coding assistant that helped create, test, and document this project.
+**Built with [Claude Code](https://claude.ai/code)** - An AI-powered coding assistant that helped create, test, and document this project. So be careful there.
+I spend quite some time with this code, so I trust it to a decent degree. There is an accompanying blog post on boris.earth.
 
 ## Overview
 
@@ -586,34 +587,3 @@ Tests are designed to be:
 - **Fast** enough for regular validation
 - **Comprehensive** in coverage
 - **Clear** in output and failure reporting
-
-## TODO
-
-### Comparison with R's splines package
-- Validate B-spline implementation against `splines::bs()`
-- Compare C-spline results with `splines::ns()` 
-- Benchmark performance differences
-- Document any discrepancies in knot placement or boundary behavior
-
-### Performance Optimizations
-- Implement iterative B-spline algorithm to avoid recursion overhead
-- Add memoization for repeated basis function evaluations
-- Profile and optimize for large datasets (10,000+ points)
-
-### Enhanced Functionality
-- Add derivative computation for both spline types
-- Implement alternative boundary conditions for B-splines (not-a-knot, clamped)
-- Add monotonic and shape-constrained spline options
-- Support for periodic/cyclic splines
-
-### Model Selection and Diagnostics
-- Implement automatic knot selection via cross-validation
-- Add WAIC and LOO-CV computation for model comparison
-- Create diagnostic plots for knot placement effectiveness
-- Add residual analysis tools
-
-### Documentation and Examples
-- Create vignette comparing spline types for different use cases
-- Add examples with real-world datasets
-- Document computational complexity and memory usage
-- Create interactive Shiny app for spline exploration
