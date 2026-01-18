@@ -1,9 +1,9 @@
 # Stan Spline Implementations: B-splines and C-splines
 
-This repository contains minimal implementations for testing B-splines and natural cubic splines (C-splines) in Stan, with comprehensive testing and comparison tools.
+This repository contains minimal implementations for testing B-splines and natural cubic splines (C-splines) in Stan, with comprehensive testing and comparison tools. A blog post about this repository is available at [boris.earth](https://www.boris.earth/claude-code-and-stan-splines.html).
 
 **Built with [Claude Code](https://claude.ai/code)** - An AI-powered coding assistant that helped create, test, and document this project. So be careful there.
-I spend quite some time with this code, so I trust it to a decent degree. There is an accompanying blog post on boris.earth.
+I spend quite some time with this code, so I trust it to a decent degree.
 
 ## Overview
 
